@@ -11,7 +11,12 @@ export default function DashboardLayout({
   const [themeMode, setThemeMode] = useState<"dark" | "light" | "system">(
     "dark",
   );
-  const [resolvedDark, setResolvedDark] = useState(true);
+  const [systemPrefersDark, setSystemPrefersDark] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
+  const resolvedDark =
+    themeMode === "system" ? systemPrefersDark : themeMode === "dark";
 
   // 👤 USER PROFILE MENU DRAWERS
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
@@ -19,16 +24,11 @@ export default function DashboardLayout({
 
   // Monitor computer system native light/dark preferences
   useEffect(() => {
-    if (themeMode === "system") {
-      const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
-      setResolvedDark(mediaQuery.matches);
-      const handler = (e: MediaQueryListEvent) => setResolvedDark(e.matches);
-      mediaQuery.addEventListener("change", handler);
-      return () => mediaQuery.removeEventListener("change", handler);
-    } else {
-      setResolvedDark(themeMode === "dark");
-    }
-  }, [themeMode]);
+    const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+    const handler = (e: MediaQueryListEvent) => setSystemPrefersDark(e.matches);
+    mediaQuery.addEventListener("change", handler);
+    return () => mediaQuery.removeEventListener("change", handler);
+  }, []);
 
   // Close profile dropdown when clicking outside the panel boundaries
   useEffect(() => {
@@ -226,7 +226,9 @@ export default function DashboardLayout({
             {/* 🎛️ HIGH-CONTRAST DROPDOWN CONTROLLER WITH BUILT-IN OPTION COLOR OVERRIDES */}
             <select
               value={themeMode}
-              onChange={(e) => setThemeMode(e.target.value as any)}
+              onChange={(e: React.ChangeEvent<HTMLSelectElement>) =>
+                setThemeMode(e.target.value as "dark" | "light" | "system")
+              }
               style={{
                 padding: "6px 14px",
                 borderRadius: "9999px",
