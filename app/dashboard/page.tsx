@@ -1,6 +1,15 @@
+// 📁 MODERN METRICS CONTAINER: app/dashboard/page.tsx
 "use client";
-import React from "react";
-// 📁 SECURED SYSTEM PATHS: Step back one level (../) to read the mock data values
+import React, { useEffect, useState } from "react";
+// ⚡ IMPORT SYSTEM METRICS DESIGN VECTORS FROM LUCIDE
+import {
+  Users,
+  Radio,
+  Film,
+  Newspaper,
+  Image,
+  MessageSquare,
+} from "lucide-react";
 import {
   initialTeamMembers,
   initialPrograms,
@@ -11,78 +20,95 @@ import {
 } from "../service/mockdata";
 
 export default function DashboardPage() {
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setLoading(false), 100);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (loading)
+    return (
+      <div className="p-4 text-xs text-slate-500 animate-pulse font-mono">
+        📡 Loading CMS Grid Metrics...
+      </div>
+    );
+
+  // Configuration helper map containing data parameters end-to-end
+  const tilesData = [
+    {
+      title: "Team Members",
+      count: initialTeamMembers?.length || 0,
+      icon: Users,
+      color: "text-blue-500 dark:text-blue-400",
+    },
+    {
+      title: "Programs",
+      count: initialPrograms?.length || 0,
+      icon: Radio,
+      color: "text-emerald-500 dark:text-emerald-400",
+    },
+    {
+      title: "Episodes",
+      count: initialEpisodes?.length || 0,
+      icon: Film,
+      color: "text-purple-500 dark:text-purple-400",
+    },
+    {
+      title: "Articles",
+      count: initialArticles?.length || 0,
+      icon: Newspaper,
+      color: "text-amber-500 dark:text-amber-400",
+    },
+    {
+      title: "Gallery",
+      count: initialGallery?.length || 0,
+      icon: Image,
+      color: "text-cyan-500 dark:text-cyan-400",
+    },
+    {
+      title: "Comments",
+      count: initialComments?.length || 0,
+      icon: MessageSquare,
+      color: "text-rose-500 dark:text-rose-400",
+    },
+  ];
+
   return (
-    <div className="space-y-8 view-fade">
-      {/* 📋 REQUIREMENTS TITLE BLOCK */}
+    <div className="space-y-5 view-fade px-1 sm:px-0">
       <div>
-        <h1 className="text-xl font-bold text-white uppercase tracking-wider text-emerald-400">
+        <h1 className="text-base sm:text-xl font-bold uppercase tracking-wider text-emerald-500 dark:text-emerald-400">
           Dashboard Home
         </h1>
-        <p className="text-xs text-slate-400 mt-0.5 font-sans">
-          Provide an overview of the entire platform metrics database records.
+        <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed">
+          Centralized platform metrics database logs.
         </p>
       </div>
 
-      {/* 📊 THE RENDERED METRIC GRID CONTAINING THE 6 EXACT BLOCKS REQUESTED IN YOUR DOC */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {/* TILE 1: TOTAL TEAM MEMBERS */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700 transition">
-          <span className="text-[10px] text-slate-400 font-bold block mb-1 uppercase tracking-wider font-mono">
-            👥 Total Team Members
-          </span>
-          <div className="text-3xl font-extrabold text-white mt-1">
-            {initialTeamMembers ? initialTeamMembers.length : 0}
-          </div>
-        </div>
-
-        {/* TILE 2: TOTAL PROGRAMS */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700 transition">
-          <span className="text-[10px] text-slate-400 font-bold block mb-1 uppercase tracking-wider font-mono">
-            🎙️ Total Programs
-          </span>
-          <div className="text-3xl font-extrabold text-white mt-1">
-            {initialPrograms ? initialPrograms.length : 0}
-          </div>
-        </div>
-
-        {/* TILE 3: TOTAL EPISODES */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700 transition">
-          <span className="text-[10px] text-slate-400 font-bold block mb-1 uppercase tracking-wider font-mono">
-            🎞️ Total Episodes
-          </span>
-          <div className="text-3xl font-extrabold text-white mt-1">
-            {initialEpisodes ? initialEpisodes.length : 0}
-          </div>
-        </div>
-        {/* TILE 4: TOTAL ARTICLES */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700 transition">
-          <span className="text-[10px] text-slate-400 font-bold block mb-1 uppercase tracking-wider font-mono">
-            📰 Total Articles
-          </span>
-          <div className="text-3xl font-extrabold text-white mt-1">
-            {initialArticles ? initialArticles.length : 0}
-          </div>
-        </div>
-
-        {/* TILE 5: TOTAL GALLERY ITEMS */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700 transition">
-          <span className="text-[10px] text-slate-400 font-bold block mb-1 uppercase tracking-wider font-mono">
-            🖼️ Total Gallery Items
-          </span>
-          <div className="text-3xl font-extrabold text-white mt-1">
-            {initialGallery ? initialGallery.length : 0}
-          </div>
-        </div>
-
-        {/* TILE 6: TOTAL COMMENTS */}
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm hover:border-slate-700 transition">
-          <span className="text-[10px] text-slate-400 font-bold block mb-1 uppercase tracking-wider font-mono">
-            💬 Total Comments
-          </span>
-          <div className="text-3xl font-extrabold text-white mt-1">
-            {initialComments ? initialComments.length : 0}
-          </div>
-        </div>
+      {/* 📊 SIDE-BY-SIDE 2 COLUMN MOBILE GRID COMPLIANT */}
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-5">
+        {tilesData.map((tile, index) => {
+          const TileIcon = tile.icon;
+          return (
+            <div
+              key={index}
+              className="bg-slate-900 border border-slate-800 rounded-xl p-3.5 sm:p-5 shadow-sm hover:border-slate-700 dark:hover:border-slate-700/60 transition flex flex-col justify-between min-h-[105px] sm:min-h-[120px]"
+            >
+              <div className="flex items-center justify-between w-full">
+                <span className="text-[9px] sm:text-[10px] text-slate-500 dark:text-slate-400 font-bold block uppercase tracking-wider font-mono truncate mr-1">
+                  {tile.title}
+                </span>
+                {/* ⚡ PREMIUM ICON GRAPHIC INTEGRATION */}
+                <TileIcon
+                  className={`w-4 h-4 sm:w-5 sm:h-5 ${tile.color} stroke-[2.25]`}
+                />
+              </div>
+              <div className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-auto">
+                {tile.count}
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

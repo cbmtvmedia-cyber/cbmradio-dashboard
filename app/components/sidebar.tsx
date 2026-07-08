@@ -1,8 +1,19 @@
-// 📁 FIXED DYNAMIC LIGHT SIDEBAR: components/sidebar.tsx
 "use client";
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+// ⚡ FORCE IMPORT DYNAMIC VECTOR ICONS FROM INSTALLED PACKAGE
+import {
+  LayoutDashboard,
+  LayoutTemplate,
+  Users,
+  Radio,
+  Film,
+  Newspaper,
+  Image,
+  MessageSquare,
+  SunMoon,
+} from "lucide-react";
 
 interface SidebarProps {
   themeMode: "dark" | "light" | "system";
@@ -19,18 +30,26 @@ export default function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
 
+  // 🛡️ REPLACED ALL STICKERS WITH PURE SVG LUCIDE COMPONENTS
   const links = [
-    { href: "/dashboard", label: "Overview Matrix", icon: "📊" },
-    { href: "/dashboard/page-sections", label: "Page Hero Zones", icon: "🖼️" },
-    { href: "/dashboard/team", label: "Station Team", icon: "👥" },
-    { href: "/dashboard/programs", label: "Radio Programs", icon: "🎙️" },
-    { href: "/dashboard/episodes", label: "Episode Archives", icon: "🎞️" },
-    { href: "/dashboard/articles", label: "News Articles", icon: "📰" },
-    { href: "/dashboard/gallery", label: "Media Gallery", icon: "🖼️" },
-    { href: "/dashboard/comments", label: "User Comments", icon: "💬" },
+    { href: "/dashboard", label: "Overview Matrix", icon: LayoutDashboard },
+    {
+      href: "/dashboard/page-sections",
+      label: "Page Hero Zones",
+      icon: LayoutTemplate,
+    },
+    { href: "/dashboard/team", label: "Station Team", icon: Users },
+    { href: "/dashboard/programs", label: "Radio Programs", icon: Radio },
+    { href: "/dashboard/episodes", label: "Episode Archives", icon: Film },
+    { href: "/dashboard/articles", label: "News Articles", icon: Newspaper },
+    { href: "/dashboard/gallery", label: "Media Gallery", icon: Image },
+    {
+      href: "/dashboard/comments",
+      label: "User Comments",
+      icon: MessageSquare,
+    },
   ];
 
-  // 🎨 CONTRAST LINK COLORS: Changes colors smoothly based on active theme choice
   const activeLinkClass = resolvedDark
     ? "bg-slate-800 text-emerald-400 border-slate-700/60"
     : "bg-slate-900 text-emerald-400 shadow-md";
@@ -49,12 +68,9 @@ export default function Sidebar({
   return (
     <div
       className="w-full flex flex-col justify-between p-4 min-h-full font-sans transition-colors duration-300"
-      /* 🚀 THE FIXED INLINE LINE: Guarantees the sidebar turns dark-white in Light Mode instead of staying black */
       style={{ backgroundColor: resolvedDark ? "#0b131a" : "#e2e8f0" }}
     >
-      {/* Upper Navigation Links Area */}
       <div className="w-full">
-        {/* Station Branding Header */}
         <div
           className={`h-12 flex items-center px-3 border-b ${brandingLineColor} mb-4 whitespace-nowrap`}
         >
@@ -72,6 +88,7 @@ export default function Sidebar({
         <nav className="flex flex-col space-y-1 w-full">
           {links.map((link) => {
             const isActive = pathname === link.href;
+            const IconComponent = link.icon;
             return (
               <Link
                 key={link.href}
@@ -83,7 +100,8 @@ export default function Sidebar({
                   isActive ? activeLinkClass : inactiveLinkClass
                 }`}
               >
-                <span className="text-sm shrink-0">{link.icon}</span>
+                {/* 🛡️ INJECT DIGITAL VECTOR FRAMEWORK */}
+                <IconComponent className="w-4 h-4 shrink-0 stroke-[2.25]" />
                 <span className="truncate">{link.label}</span>
               </Link>
             );
@@ -91,13 +109,15 @@ export default function Sidebar({
         </nav>
       </div>
 
-      {/* LOWER ANCHOR DECK: THE INTEGRATED THEME CONTROLLER SELECTOR */}
       <div className={`pt-4 border-t ${brandingLineColor} mt-6 px-1`}>
-        <label
-          className={`block text-[10px] font-bold ${labelTextColor} uppercase tracking-widest mb-2 font-mono`}
-        >
-          Interface Theme
-        </label>
+        <div className="flex items-center space-x-2 text-slate-500 mb-2">
+          <SunMoon className="w-3.5 h-3.5" />
+          <label
+            className={`block text-[10px] font-bold ${labelTextColor} uppercase tracking-widest font-mono`}
+          >
+            Interface Theme
+          </label>
+        </div>
         <div className="relative w-full">
           <select
             value={themeMode}
@@ -111,27 +131,9 @@ export default function Sidebar({
               color: resolvedDark ? "#f8fafc" : "#0f172a",
             }}
           >
-            <option
-              value="dark"
-              style={{ backgroundColor: "#0b131a", color: "#f8fafc" }}
-            >
-              🌙 Dark Mode
-            </option>
-            <option
-              value="light"
-              style={{ backgroundColor: "#ffffff", color: "#0f172a" }}
-            >
-              ☀️ Light Mode
-            </option>
-            <option
-              value="system"
-              style={{
-                backgroundColor: resolvedDark ? "#0b131a" : "#ffffff",
-                color: resolvedDark ? "#94a3b8" : "#0f172a",
-              }}
-            >
-              💻 System Default
-            </option>
+            <option value="dark">🌙 Dark Mode</option>
+            <option value="light">☀️ Light Mode</option>
+            <option value="system">💻 System Default</option>
           </select>
         </div>
       </div>
