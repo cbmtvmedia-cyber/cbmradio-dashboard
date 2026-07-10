@@ -16,7 +16,7 @@ export default function ProgramsPage() {
   const [list, setList] = useState<Program[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [editingProgram, setEditingSection] = useState<Program | null>(null);
+  const [editingProgram, setEditingProgram] = useState<Program | null>(null);
   const [search, setSearch] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
@@ -81,7 +81,7 @@ export default function ProgramsPage() {
   };
 
   const startEdit = (p: Program) => {
-    setEditingSection(p);
+    setEditingProgram(p);
     setTitle(p.title);
     setDescription(p.description);
     setCoverImage(p.coverImage);
@@ -102,7 +102,7 @@ export default function ProgramsPage() {
     setDescription("");
     setCoverImage("");
     setPresenter("");
-    setEditingSection(null);
+    setEditingProgram(null);
     setShowForm(false);
     setTimeout(() => setToast(null), 2500);
   };
@@ -243,7 +243,7 @@ export default function ProgramsPage() {
               key={prog.id}
               className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col sm:flex-row group hover:border-slate-700 transition"
             >
-              <div className="w-full sm:w-36 h-40 bg-slate-950 border-b sm:border-b-0 sm:border-r border-slate-800 shrink-0">
+              <div className="relative w-full sm:w-36 h-40 bg-slate-950 border-b sm:border-b-0 sm:border-r border-slate-800 shrink-0">
                 <Image
                   src={
                     prog.coverImage ||
