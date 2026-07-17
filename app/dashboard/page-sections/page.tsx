@@ -35,6 +35,7 @@ export default function PageSectionsPage() {
       .then((res) => res.json())
       .then((data) => {
         setList(data);
+        localStorage.setItem("pageSectionsList", JSON.stringify(data));
         setLoading(false);
       })
       .catch(() => setLoading(false));
