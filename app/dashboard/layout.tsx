@@ -21,7 +21,7 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [themeMode, setThemeMode] = useState<"dark" | "light" | "system">("dark");
+  const [themeMode, setThemeMode] = useState<"dark" | "light" | "system">("system");
   const [resolvedDark, setResolvedDark] = useState(true);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -35,6 +35,12 @@ export default function DashboardLayout({
   const [comments, setComments] = useState(initialComments);
 
   useEffect(() => {
+      const systemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+  if (themeMode === "dark" || (themeMode === "system" && systemDark)) {
+    document.documentElement.classList.add("dark");
+  } else {
+    document.documentElement.classList.remove("dark");
+  }
     if (themeMode === "system") {
       const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
       const handler = (e: MediaQueryListEvent) => setResolvedDark(e.matches);
@@ -246,7 +252,7 @@ export default function DashboardLayout({
                   </div>
                   <div
                     style={{
-                      fontSize: "9px",
+                      fontSize: "5px",
                       color: "#34d399",
                       fontWeight: "800",
                       textTransform: "uppercase",
@@ -258,8 +264,8 @@ export default function DashboardLayout({
                 </div>
                 <div
                   style={{
-                    width: "32px",
-                    height: "32px",
+                    width: "25px",
+                    height: "25px",
                     borderRadius: "50%",
                     background:
                       "linear-gradient(135deg, #34d399 0%, #a855f7 100%)",

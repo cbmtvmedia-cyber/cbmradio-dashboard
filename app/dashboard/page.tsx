@@ -8,6 +8,7 @@ import {
   Image as ImageIcon, 
   ArrowUpRight, 
   Play, 
+
   Users,
   Activity
 } from "lucide-react";
@@ -51,6 +52,7 @@ interface ArticleSchema {
 
 export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
   const [liveEpisodes, setLiveEpisodes] = useState<EpisodeSchema[]>([]);
   const [livePrograms, setLivePrograms] = useState<ProgramSchema[]>([]);
   const [liveArticles, setLiveArticles] = useState<ArticleSchema[]>([]);
@@ -153,6 +155,17 @@ export default function DashboardPage() {
         <div>
           <h1 className="text-base sm:text-lg font-black uppercase text-white flex items-center gap-2 tracking-wide">
             <span className="text-emerald-500 font-mono font-bold">|</span> CONTROL STATION
+          {/* 🟢 PLACE THIS INPUT FIELD INSIDE YOUR HEADER DIV WRAPPER */}
+<div className="relative w-full sm:w-72 mt-2 sm:mt-0">
+  <input
+    type="text"
+    placeholder="Search programs or episodes..."
+    value={searchTerm}
+    onChange={(e) => setSearchTerm(e.target.value)}
+    className="w-full px-3 py-1.5 rounded-lg border text-xs font-mono font-medium focus:outline-none transition duration-150 bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-900 dark:text-slate-100 focus:border-emerald-500"
+  />
+</div>
+  
           </h1>
           <p className="text-[11px] text-slate-400 mt-0.5 leading-relaxed">Comprehensive real-time reporting console mapping database logs and network traffic metrics.</p>
         </div>
@@ -162,7 +175,8 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
         
         {/* 📺 LEFT COLUMN (7 SPANS): MEDIA PERFORMANCE WORKSPACE */}
-        <div className="lg:col-span-7 space-y-5">
+        <div className="lg:col-span-7 flex flex-col justify-between space-y-5 h-full">
+
           
           {/* ⚡ FIXED DARK THEME OVERRIDE: Switched panel container styling background to crisp deep slate-900 */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 min-h-[220px] flex flex-col justify-between shadow-sm">
@@ -283,7 +297,12 @@ export default function DashboardPage() {
             </div>
 
             {activeSlidingProgram ? (
-              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between transition hover:border-slate-700/80 form-slide">
+            <div  className={`p-3 flex items-center justify-between transition rounded-xl border form-slide ${
+                      typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+                    ? "bg-slate-950/60 border-slate-800"
+              : "bg-slate-100 border-slate-200"
+               }`}>
+
                 <div className="flex items-center space-x-3 min-w-0 flex-1">
                   <div className="relative w-12 h-12 rounded-lg bg-slate-900 border border-slate-800 shrink-0 overflow-hidden">
                     <Image 
@@ -319,7 +338,13 @@ export default function DashboardPage() {
             </div>
 
             {activeSlidingEpisode ? (
-              <div className="bg-slate-950/60 border border-slate-800 rounded-xl p-3 flex items-center justify-between transition hover:border-slate-700/80 form-slide">
+              // 🟢 REPLACE THAT TOP OUTER <div ... > LINE WITH THIS EXACT STRING:
+           <div className={`border rounded-xl p-3 flex items-center justify-between transition duration-150 form-slide ${
+                        typeof document !== "undefined" && document.documentElement.classList.contains("dark")
+                        ? "bg-slate-950/60 border-slate-800"
+                       : "bg-slate-100 border-slate-200"
+                 }`}>
+
                 <div className="flex items-center space-x-3 min-w-0 flex-1">
                   <div className="relative w-12 h-12 rounded-lg bg-slate-900 border border-slate-800 shrink-0 overflow-hidden">
                     <Image 
