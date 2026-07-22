@@ -1,34 +1,56 @@
-// 📁 FILE 2: app/api/comments/route.ts
-// ==========================================
+// 📁 FILE PATH: app/api/comments/route.ts
 import { NextResponse } from "next/server";
-import fs from "fs";
-import path from "path";
 
-const dataFilePath = path.join(process.cwd(), "service", "commentsData.json");
+const RAILWAY_API_URL = process.env.NEXT_PUBLIC_API_URL || "https://railway.app";
 
-const readDatabaseFile = () => {
+interface CommentSchema {
+  id: string;
+  sender: string;
+  text: string;
+  targetType: string;
+  targetTitle: string;
+  timestamp: string;
+}
+
+export async function GET() {
   try {
-    if (!fs.existsSync(dataFilePath)) {
-      const baselineData = [
-        { id: "com-1", sender: "Listener John", text: "Loving the alternative tracks mix on the morning block!", targetType: "Episode", targetTitle: "Live Studio Session Mix", timestamp: "Historical Log" }
-      ];
-      fs.mkdirSync(path.dirname(dataFilePath), { recursive: true });
-      fs.writeFileSync(dataFilePath, JSON.stringify(baselineData, null, 2), "utf-8");
-      return baselineData;
-    }
-    return JSON.parse(fs.readFileSync(dataFilePath, "utf-8"));
-  } catch { return []; }
-};
-
-const writeDatabaseFile = (data: unknown) => fs.writeFileSync(dataFilePath, JSON.stringify(data, null, 2), "utf-8");
-
-export async function GET() { return NextResponse.json(readDatabaseFile()); }
+    const response = await fetch(`${RAILWAY_API_URL}/api/comments`, { cache: "no-store" });
+    if (!response.ok) throw new Error("Railway fetch failed");
+    
+    const data: CommentSchema[] = await response.json();
+    return NextResponse.json(data);
+  } catch {
+    // 🟢 Your exact original baseline data maintained as a safe fallback
+    return NextResponse.json([
+      { 
+        id: "com-1", 
+        sender: "Listener John", 
+        text: "Loving the alternative tracks mix on the morning block!", 
+        targetType: "Episode", 
+        targetTitle: "Live Studio Session Mix", 
+        timestamp: "Historical Log" 
+      }
+    ]);
+  }
+}
 
 export async function POST(request: Request) {
-  const currentDatabase = readDatabaseFile();
-  const body = await request.json();
-  const newRecord = { id: `com-${Date.now()}`, timestamp: "Just Now", ...body };
-  currentDatabase.unshift(newRecord);
-  writeDatabaseFile(currentDatabase);
-  return NextResponse.json(newRecord);
+  try {
+    const body = await request.json();
+    const payload = {
+      timestamp: "Just Now",
+      ...body
+    };
+
+    const response = await fetch(`${RAILWAY_API_URL}/api/comments`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    
+    const newRecord: CommentSchema = await response.json();
+    return NextResponse.json(newRecord);
+  } catch {
+    return NextResponse.json({ error: "Failed to write comment to backend" }, { status: 500 });
+  }
 }
