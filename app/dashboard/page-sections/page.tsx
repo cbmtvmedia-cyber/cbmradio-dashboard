@@ -35,7 +35,7 @@ export default function PageSectionsPage() {
       .then((res) => res.json())
       .then((data) => {
         setList(data);
-        localStorage.setItem("pageSectionsList", JSON.stringify(data));
+       
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -59,13 +59,14 @@ export default function PageSectionsPage() {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        id: editingSection.id,
-        title: editTitle,
-        subtitle: editSubtitle,
-        description: editDescription,
-        image: editImage,
-        backgroundImage: editBgImage,
-        video: editVideo
+  section_key: editingSection.id, 
+  title: editingSection.title,
+  subtitle: editingSection.subtitle,
+  body: editingSection.title || "", 
+  image: editingSection.image, 
+  cta_label: "", 
+  cta_url: "",
+  is_active: true,
       }),
     });
 

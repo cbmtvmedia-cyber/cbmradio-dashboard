@@ -31,7 +31,7 @@ export default function TeamPage() {
       .then((res) => res.json())
       .then((data) => {
         setList(data);
-        localStorage.setItem("radio_team", JSON.stringify(data));
+     
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -45,26 +45,42 @@ export default function TeamPage() {
       const res = await fetch("/api/team", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingMember.id, name, position, category, bio, image }),
+        body: JSON.stringify({ 
+        id: editingMember.id, 
+        name, 
+        role: position,   // 🔄 Maps 'position' to 'role'
+        category, 
+        bio, 
+        photo: image      // 🔄 Maps local 'image' state to 'photo'
+      }),
       });
       if (res.ok) {
         const updated = await res.json();
         const updatedList = list.map((m) => (m.id === updated.id ? updated : m));
         setList(updatedList);
-        localStorage.setItem("radio_team", JSON.stringify(updatedList));
+        if (typeof window !== "undefined")
+        
         setToast("👥 Team member details successfully updated!");
       }
     } else {
       const res = await fetch("/api/team", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, position, category, bio: bio || "Station Staff Member.", image: image || "https://unsplash.com" }),
+              body: JSON.stringify({ 
+        name, 
+        role: position,   // 🔄 Maps 'position' to 'role' for the backend
+        category, 
+        bio: bio || "Station Staff Member.", 
+        photo: image || "https://unsplash.com" 
+              }),// 🔄 Maps 'image' to 'photo' for the backend
       });
+
       if (res.ok) {
         const newMember = await res.json();
         const updatedList = [newMember, ...list];
         setList(updatedList);
-        localStorage.setItem("radio_team", JSON.stringify(updatedList));
+       
+        
         setToast("👥 New staff profile added to directory live!");
       }
     }
@@ -84,7 +100,7 @@ export default function TeamPage() {
   const handleDelete = (id: string, memberName: string) => {
     const updatedList = list.filter((item) => item.id !== id);
     setList(updatedList);
-    localStorage.setItem("radio_team", JSON.stringify(updatedList));
+    
     setToast(`🗑️ Profile for "${memberName.toUpperCase()}" removed successfully.`);
     setTimeout(() => setToast(null), 2500);
   };

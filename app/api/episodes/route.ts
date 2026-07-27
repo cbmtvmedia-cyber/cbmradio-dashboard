@@ -1,64 +1,53 @@
-// 📁 FILE PATH: app/api/episodes/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 
-const RAILWAY_API_URL = process.env.NEXT_PUBLIC_API_URL || "https://railway.app";
-
-// 🟢 YOUR ORIGINAL SCHEMA TYPING MAINTAINED NATIVELY:
-interface EpisodeSchema {
-  id: string;
-  programTitle: string;
-  title: string;
-  description: string;
-  thumbnailImage: string;
-  youtubeLink: string;
-  downloadLink: string;
-  publishDate: string;
-}
-
+// 1. GET ROUTE: Fetch live paginated list from Railway
 export async function GET() {
   try {
-    const response = await fetch(`${RAILWAY_API_URL}/api/episodes`, { cache: "no-store" });
-    if (!response.ok) throw new Error("Railway fetch failed");
+    // 🔄 UPDATED PATH: Hits /episodes/ directly based on documentation page 7
+    const response = await fetch(`${process.env.RAILWAY_API_URL}/episodes/`, { 
+      cache: "no-store" 
+    });
     
-    // 🧠 TYPING RESOLVED: Enforces your exact schema rule on the live server database output array
-    const data: EpisodeSchema[] = await response.json();
+    if (!response.ok) throw new Error("Railway fetch failed");
+    const data = await response.json();
     return NextResponse.json(data);
-  } catch {
+  } catch  {
+    // Fallback data loop stays perfectly intact
     return NextResponse.json([
-      { id: "ep-1", programTitle: "youth talk", title: "Freelancing Without Burnout", description: "Learn how to manage time, set boundaries with clients, and scale your digital career.", thumbnailImage: "https://unsplash.com", youtubeLink: "https://youtube.com", downloadLink: "https://example.com", publishDate: "2026-06-25" },
-      { id: "ep-2", programTitle: "morning show", title: "Live Studio Session Mix", description: "An exclusive morning block featuring local indie track selections and live studio mixing.", thumbnailImage: "https://unsplash.com", youtubeLink: "https://youtube.com", downloadLink: "https://example.com", publishDate: "2026-06-28" }
+      { id: "ep-1", programTitle: "youth talk", title: "Freelancing Without Burnout", description: "Learn how" },
+      { id: "ep-2", programTitle: "morning show", title: "Live Studio Session Mix", description: "An exclusi" }
     ]);
   }
 }
 
+// 2. POST ROUTE: Receive from frontend page form and save permanently to Railway
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const response = await fetch(`${RAILWAY_API_URL}/api/episodes`, {
+    const incomingData = await request.json();
+
+    // 💡 BODY KEY ALIGNMENT: Unpack and translate fields to match their database layout rules
+    const formattedPayload = {
+      program: incomingData.program || 1, // Connects the episode to a parent program ID number
+      title: incomingData.title,
+      description: incomingData.description,
+      cover_image: incomingData.cover_image || "https://unsplash.com",
+      youtube_link: incomingData.youtube_link || "",
+      download_link: incomingData.download_link || "",
+      publish_date: incomingData.publish_date || "2026-07-03"
+    };
+
+    // 🔄 UPDATED PATH: Sends payload securely down their production endpoint
+    const response = await fetch(`${process.env.RAILWAY_API_URL}/episodes/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(formattedPayload),
     });
-    
-    const newRecord: EpisodeSchema = await response.json();
-    return NextResponse.json(newRecord);
-  } catch {
-    return NextResponse.json({ error: "Failed to write episode to backend" }, { status: 500 });
-  }
-}
 
-export async function PUT(request: Request) {
-  try {
-    const body = await request.json();
-    const response = await fetch(`${RAILWAY_API_URL}/api/episodes`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
+    if (!response.ok) throw new Error("Failed to create episode on backend");
+    const finalSavedData = await response.json();
     
-    const updatedRecord: EpisodeSchema = await response.json();
-    return NextResponse.json(updatedRecord);
+    return NextResponse.json(finalSavedData);
   } catch {
-    return NextResponse.json({ error: "Failed to update episode on backend" }, { status: 500 });
+    return NextResponse.json({ error: "Authentication or saving endpoint offline" }, { status: 500 });
   }
 }

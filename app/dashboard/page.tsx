@@ -7,7 +7,8 @@ import {
   Newspaper, 
   Image as ImageIcon, 
   ArrowUpRight, 
-  Play, 
+  Play,
+   
 
   Users,
   Activity
@@ -73,47 +74,44 @@ export default function DashboardPage() {
     audioDownloads: 109
   });
 
-  useEffect(() => {
-    // 🧠 SYSTEM DEFAULT LOGIC: Checks local preference first, otherwise matches native OS settings
-    if (typeof window !== "undefined") {
-      const savedTheme = localStorage.getItem("theme");
-      const prefersSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      
-      if (savedTheme === "dark" || (!savedTheme && prefersSystemDark)) {
-        document.documentElement.classList.add("dark");
-      } else {
-        document.documentElement.classList.remove("dark");
-      }
-    }
+ useEffect(() => { 
+  // 🧠 SYSTEM DEFAULT LOGIC: Checks local preference first, otherwise matches native OS settings
+  if (typeof window !== "undefined") { 
+    const savedTheme = localStorage.getItem("theme"); 
+    const prefersSystemDark = window.matchMedia("(prefers-color-scheme: dark)").matches; 
+    if (savedTheme === "dark" || (!savedTheme && prefersSystemDark)) { 
+      document.documentElement.classList.add("dark"); 
+    } else { 
+      document.documentElement.classList.remove("dark"); 
+    } 
+  } 
 
-    const updateAllLiveCounts = () => {
-      if (typeof window !== "undefined") {
-        const savedEps = localStorage.getItem("radio_episodes");
-        const savedProgs = localStorage.getItem("radio_programs");
-        const savedArts = localStorage.getItem("radio_articles");
-        
-        const currentEps = savedEps ? JSON.parse(savedEps) : initialEpisodes;
-        const currentProgs = savedProgs ? JSON.parse(savedProgs) : initialPrograms;
-        const currentArts = savedArts ? JSON.parse(savedArts) : initialArticles;
+  const updateAllLiveCounts = () => { 
+    if (typeof window !== "undefined") { 
+      // ✅ FIX: Rely purely on your mockdata vectors until the backend team binds live arrays
+       const currentEps = initialEpisodes as unknown as EpisodeSchema[];
+      const currentProgs = initialPrograms as unknown as ProgramSchema[];
+      const currentArts = initialArticles as unknown as ArticleSchema[];
+      setLiveEpisodes(currentEps); 
+      setLivePrograms(currentProgs); 
+      setLiveArticles(currentArts); 
 
-        setLiveEpisodes(currentEps);
-        setLivePrograms(currentProgs);
-        setLiveArticles(currentArts);
+      setCounts({ 
+        team: initialTeamMembers?.length || 0, 
+        programs: currentProgs?.length || 0, 
+        episodes: currentEps?.length || 0, 
+        articles: currentArts?.length || 0, 
+        gallery: initialGallery?.length || 0, 
+        comments: initialComments?.length || 0, 
+        activeListeners: Math.floor(Math.random() * 10) + 18, 
+        dailyVisitors: 142, 
+        audioDownloads: 109 + (currentEps?.length || 0) * 3 
+      }); 
+    } 
+    setLoading(false); 
+  };
 
-        setCounts({
-          team: initialTeamMembers?.length || 0,
-          programs: currentProgs?.length || 0,
-          episodes: currentEps?.length || 0,
-          articles: currentArts?.length || 0,
-          gallery: initialGallery?.length || 0,
-          comments: initialComments?.length || 0,
-          activeListeners: Math.floor(Math.random() * 10) + 18,
-          dailyVisitors: 142,
-          audioDownloads: 109 + (currentEps?.length || 0) * 3
-        });
-      }
-      setLoading(false);
-    };
+
 
     updateAllLiveCounts();
 
@@ -146,7 +144,7 @@ export default function DashboardPage() {
   
   const activeSlidingProgram = livePrograms.length > 0 ? livePrograms[currentProgIndex % livePrograms.length] : null;
   const activeSlidingEpisode = liveEpisodes.length > 0 ? liveEpisodes[currentEpIndex % liveEpisodes.length] : null;
-// 📁 FILE PATH: app/dashboard/page.tsx - BLOCK 2 OF 4
+
   return (
     <div className="space-y-6 view-fade px-1 sm:px-0 select-none text-xs text-slate-400 bg-slate-950 min-h-screen p-4">
       

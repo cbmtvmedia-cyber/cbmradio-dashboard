@@ -33,14 +33,15 @@ export default function CommentsPage() {
     fetch("/api/comments")
       .then((res) => res.json())
       .then((data) => {
-        const commentsData = data || [];
+        // 💡 UPDATED: Safely target the paginated results array from the backend server
+        const commentsData = data.results || [];
         setList(commentsData);
-        // ⚡ THE SYNC: Seed initial fetch array so the home metrics counter updates on first load
-        localStorage.setItem("radio_comments", JSON.stringify(commentsData));
+        
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
+
 
   // 📡 CRITICAL SPEC RULE: Comments are displayed immediately after submission
   const handleVisitorSubmit = async (e: React.FormEvent) => {
@@ -60,8 +61,7 @@ export default function CommentsPage() {
     // Array unshift forces the new comment to render at the top instantly
     const updatedList = [newComment, ...list];
     setList(updatedList);
-    // ⚡ THE SYNC: Push new list into localStorage so home counters increment instantly
-    localStorage.setItem("radio_comments", JSON.stringify(updatedList));
+
 
     // Clear inputs and hide the testing box
     setSender("");
@@ -81,8 +81,7 @@ export default function CommentsPage() {
       com.id === id ? { ...com, replyText: typedReply } : com
     );
     setList(updatedList);
-    // ⚡ THE SYNC: Save updated array with the admin reply attached
-    localStorage.setItem("radio_comments", JSON.stringify(updatedList));
+  
 
     setActiveReplyId(null);
     setTypedReply("");
@@ -94,7 +93,7 @@ export default function CommentsPage() {
     const updatedList = list.filter((item) => item.id !== id);
     setList(updatedList);
     // ⚡ THE SYNC: Lower lengths inside cache so home screen tile drops instantly
-    localStorage.setItem("radio_comments", JSON.stringify(updatedList));
+ 
 
     setToast("🗑️ Comment permanently removed from view layout.");
     setTimeout(() => setToast(null), 2500);

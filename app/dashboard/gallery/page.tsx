@@ -49,8 +49,8 @@ export default function GalleryPage() {
         }
         
         // Baseline fallback path if no cache exists yet
-        setList(serverData); 
-        localStorage.setItem("radio_gallery", JSON.stringify(serverData));
+        setList(serverData);
+     
         setLoading(false); 
       }) 
       .catch(() => setLoading(false)); 
@@ -78,13 +78,16 @@ export default function GalleryPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          caption: caption.trim(),
-          url: url.trim(),
-          category: category,
-          youtubeLink: category === "Videos" ? youtubeLink.trim() : "",
+      title: caption.trim(), // 💡 Map caption to 'title' if they use title for the main header
+      caption: caption.trim(),
+      image: url.trim(), // 🔄 CHANGED: Use 'image' instead of 'url'
+      category: category,
+      youtube_link: category === "Videos" ? youtubeLink.trim() : "",
+        
         }),
       });
 
+    
       if (res.ok) {
         const serverResponseData = await res.json();
         const validatedAsset = serverResponseData && typeof serverResponseData === "object" && serverResponseData.id 
@@ -93,7 +96,7 @@ export default function GalleryPage() {
 
         const updatedList = [validatedAsset, ...list];
         setList(updatedList);
-        localStorage.setItem("radio_gallery", JSON.stringify(updatedList));
+        
         executeFormReset();
         return;
       }
@@ -103,14 +106,13 @@ export default function GalleryPage() {
 
     const localUpdatedList = [localNewMedia, ...list];
     setList(localUpdatedList);
-    localStorage.setItem("radio_gallery", JSON.stringify(localUpdatedList));
     executeFormReset();
   };
 
   const handleDelete = (id: string) => {
     const updatedList = list.filter((item) => item.id !== id);
     setList(updatedList);
-    localStorage.setItem("radio_gallery", JSON.stringify(updatedList));
+    
     setToast("🗑️ Media file deleted from admin catalog.");
     setTimeout(() => setToast(null), 2500);
   };

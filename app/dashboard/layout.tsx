@@ -1,5 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef, createContext, useContext } from "react";
+import Image from "next/image";
 import Sidebar from "../components/sidebar";
 // ⚡ Link your exact local database file mock arrays
 import {
@@ -25,6 +26,11 @@ export default function DashboardLayout({
   const [resolvedDark, setResolvedDark] = useState(true);
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const profilePhotoInputRef = useRef<HTMLInputElement>(null);
+  const [currentUser, setCurrentUser] = useState<{ email: string; photo: string | null }>({
+    email: "",
+    photo: null,
+  });
 
   // 📁 LIVE STATE TRACKING VAULTS: Keeps counts accurate when items change
   const [team, setTeam] = useState(initialTeamMembers);
@@ -99,6 +105,33 @@ export default function DashboardLayout({
   const profileCardBg = resolvedDark ? "rgba(255,255,255,0.04)" : "rgba(15, 23, 42, 0.03)";
   const sidebarBg = resolvedDark ? "#0b131a" : "#e2e8f0";
   const sidebarBorder = resolvedDark ? "1px solid rgba(255,255,255,0.06)" : "1px solid #cbd5e1";
+  const displayName = "Admin";
+  const initials = displayName.slice(0, 2).toUpperCase();
+
+  const updatePhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setCurrentUser((user) => ({ ...user, photo: URL.createObjectURL(file) }));
+  };
+
+  const signOut = () => {
+  setProfileDropdownOpen(false);
+  
+  // 💡 Enhanced Cookie Wipe: Adds an immediate expiration fallback
+  document.cookie = "admin_jwt_token=; path=/; max-age=0; SameSite=Strict; Secure";
+  document.cookie = "admin_jwt_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict; Secure";
+  
+  // ✅ Keep these cleanup items! They clear user memory tracks perfectly on exit.
+  localStorage.removeItem("currentUser");
+  localStorage.removeItem("loggedInUser");
+  localStorage.removeItem("user");
+  localStorage.removeItem("token");
+  sessionStorage.clear();
+
+  window.location.replace("/login");
+};
+
+
   return (
     <CMSContext.Provider value={{ team, setTeam, programs, setPrograms, episodes, setEpisodes, articles, setArticles, gallery, setGallery, comments, setComments }}>
       <div
@@ -224,121 +257,125 @@ export default function DashboardLayout({
             </div>
 
             <div className="relative" ref={dropdownRef}>
-              <div
-                onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: "12px",
-                  backgroundColor: profileCardBg,
-                  border: resolvedDark
-                    ? "1px solid rgba(255,255,255,0.06)"
-                    : "1px solid #cbd5e1",
-                  borderRadius: "9999px",
-                  padding: "4px 6px 4px 16px",
-                  cursor: "pointer",
-                }}
-                className="hover:border-emerald-500/50 shadow-sm group transition select-none"
-              >
-                <div style={{ textAlign: "right" }} className="hidden sm:block">
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: "700",
-                      color: currentTextColor,
-                    }}
-                  >
-                    Alex Mercer
-                  </div>
-                  <div
-                    style={{
-                      fontSize: "5px",
-                      color: "#34d399",
-                      fontWeight: "800",
-                      textTransform: "uppercase",
-                      letterSpacing: "0.12em",
-                    }}
-                  >
-                    Station Manager
-                  </div>
-                </div>
-                <div
-                  style={{
-                    width: "25px",
-                    height: "25px",
-                    borderRadius: "50%",
-                    background:
-                      "linear-gradient(135deg, #34d399 0%, #a855f7 100%)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: "12px",
-                    fontWeight: "900",
-                    color: "#ffffff",
-                  }}
-                >
-                  AM
-                </div>
-              </div>
+  <div
+    onClick={() => setProfileDropdownOpen(!profileDropdownOpen)}
+    style={{
+      display: "flex",
+      alignItems: "center",
+      gap: "12px",
+      backgroundColor: profileCardBg,
+      border: resolvedDark
+        ? "1px solid rgba(255,255,255,0.06)"
+        : "1px solid #cbd5e1",
+      borderRadius: "9999px",
+      padding: "4px 6px 4px 16px",
+      cursor: "pointer",
+    }}
+    className="hover:border-emerald-500/50 shadow-sm group transition select-none"
+  >
+    <div style={{ textAlign: "right" }} className="hidden sm:block">
+      <div
+        style={{
+          fontSize: "12px",
+          fontWeight: "700",
+          color: currentTextColor,
+        }}
+      >
+        {displayName}
+      </div>
+      <div
+        style={{
+          fontSize: "10px",
+          color: "#34d399",
+          fontWeight: "800",
+          textTransform: "uppercase",
+          letterSpacing: "0.12em",
+        }}
+      >
+        Signed In
+      </div>
+    </div>
 
-              {profileDropdownOpen && (
-                <div
-                  className="absolute right-0 mt-2 w-56 rounded-xl shadow-2xl border p-2 form-slide text-xs"
-                  style={{
-                    backgroundColor: resolvedDark ? "#0b1b26" : "#f1f5f9",
-                    borderColor: resolvedDark ? "rgba(255,255,255,0.08)" : "#cbd5e1",
-                    color: currentTextColor,
-                    zIndex: 9999,
-                    backdropFilter: "none",
-                    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.3)",
-                  }}
-                >
-                  <div
-                    className="px-3 py-2 mb-1 border-b"
-                    style={{
-                      borderColor: resolvedDark
-                        ? "rgba(255,255,255,0.08)"
-                        : "#cbd5e1",
-                    }}
-                  >
-                    <p className="font-bold text-slate-400 font-mono text-[9px] uppercase tracking-wider">
-                      Account Node
-                    </p>
-                    <p className="font-semibold truncate text-emerald-600 dark:text-emerald-400">
-                      alex.mercer@cbmradio.com
-                    </p>
-                  </div>
-                  <div className="space-y-0.5">
-                    <button
-                      onClick={() => alert("Loading official profile credentials...")}
-                      className="w-full text-left px-3 py-2 rounded-lg font-medium transition cursor-pointer hover:bg-emerald-500/10 hover:text-emerald-500"
-                    >
-                      👤 View Profile Settings
-                    </button>
-                    <button
-                      onClick={() => alert("CMS Encryption Security Tokens verified.")}
-                      className="w-full text-left px-3 py-2 rounded-lg font-medium transition cursor-pointer hover:bg-emerald-500/10 hover:text-emerald-500"
-                    >
-                      🔑 Security Tokens
-                    </button>
-                    <div
-                      className="my-1 border-t"
-                      style={{
-                        borderColor: resolvedDark
-                          ? "rgba(255,255,255,0.08)"
-                          : "#cbd5e1",
-                      }}
-                    ></div>
-                    <button
-                      onClick={() => alert("Logging out of administrative session node...")}
-                      className="w-full text-left px-3 py-2 rounded-lg text-rose-500 font-bold transition cursor-pointer hover:bg-rose-500/10"
-                    >
-                      🚪 Sign Out System
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+    {currentUser.photo ? (
+      <Image
+        src={currentUser.photo}
+        alt="Profile"
+        width={25}
+        height={25}
+        style={{
+          width: "25px",
+          height: "25px",
+          borderRadius: "50%",
+          objectFit: "cover",
+        }}
+      />
+    ) : (
+      <div
+        style={{
+          width: "25px",
+          height: "25px",
+          borderRadius: "50%",
+          background: "linear-gradient(135deg, #34d399 0%, #a855f7 100%)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: "10px",
+          fontWeight: "900",
+          color: "#ffffff",
+        }}
+      >
+        {initials}
+      </div>
+    )}
+  </div>
+
+  {profileDropdownOpen && (
+    <div
+      className="absolute right-0 mt-2 w-56 rounded-xl shadow-2xl border p-2 form-slide text-xs"
+      style={{
+        backgroundColor: resolvedDark ? "#0b1b26" : "#f1f5f9",
+        borderColor: resolvedDark
+          ? "rgba(255,255,255,0.08)"
+          : "#cbd5e1",
+        color: currentTextColor,
+        zIndex: 9999,
+      }}
+    >
+      <div className="px-3 py-2 mb-1 border-b">
+        <p className="font-bold text-slate-400 font-mono text-[9px] uppercase">
+          Current Account
+        </p>
+       
+      </div>
+
+      <input
+        ref={profilePhotoInputRef}
+        type="file"
+        accept="image/*"
+        onChange={updatePhoto}
+        className="hidden"
+      />
+
+      <button
+        type="button"
+        onClick={() => profilePhotoInputRef.current?.click()}
+        className="w-full text-left px-3 py-2 rounded-lg font-medium transition cursor-pointer hover:bg-emerald-500/10 hover:text-emerald-500"
+      >
+        📷 Update Profile Photo
+      </button>
+
+      <div className="my-1 border-t" />
+
+      <button
+        type="button"
+        onClick={signOut}
+        className="w-full text-left px-3 py-2 rounded-lg text-rose-500 font-bold transition cursor-pointer hover:bg-rose-500/10"
+      >
+        🚪 Sign Out
+      </button>
+    </div>
+  )}
+</div>
           </header>
 
           <main className="flex-1 overflow-y-auto p-4 sm:p-8 bg-transparent min-w-0 no-scrollbar">

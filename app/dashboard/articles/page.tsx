@@ -26,12 +26,14 @@ export default function ArticlesPage() {
   const [coverImage, setCoverImage] = useState("");
   const [status, setStatus] = useState<"Draft" | "Published">("Draft");
 
-  useEffect(() => {
+    useEffect(() => {
     fetch("/api/articles")
       .then((res) => res.json())
       .then((data) => {
-        setList(data);
-        localStorage.setItem("radio_articles", JSON.stringify(data));
+        // 💡 UPDATED: Read from the backend's paginated results property
+        setList(data.results || []);
+        
+        // ❌ REMOVED: The entire local storage block has been completely stripped out
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -45,31 +47,45 @@ export default function ArticlesPage() {
       const res = await fetch("/api/articles", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingArticle.id, title, summary, content, coverImage, status }),
+        body: JSON.stringify({ id: editingArticle.id, title, summary, body: content, cover_image: coverImage, status }),
+
       });
-      if (res.ok) {
-        const updated = await res.json();
-        const updatedList = list.map((a) => (a.id === updated.id ? updated : a));
-        setList(updatedList);
-        localStorage.setItem("radio_articles", JSON.stringify(updatedList));
-        setToast("📰 Article contents successfully updated!");
-      }
-    } else {
-      const res = await fetch("/api/articles", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ title, summary: summary || "CBM broadcast bulletin.", content, coverImage: coverImage || "https://unsplash.com", status }),
-      });
-      if (res.ok) {
-        const newArticle = await res.json();
-        const updatedList = [newArticle, ...list];
-        setList(updatedList);
-        localStorage.setItem("radio_articles", JSON.stringify(updatedList));
-        setToast("📰 New news article published to directory live!");
-      }
+          if (res.ok) {
+      const updated = await res.json();
+      const updatedList = list.map((a) => (a.id === updated.id ? updated : a));
+      setList(updatedList);
+
+      
+      setToast("📰 Article contents successfully updated!");
     }
-    clearForm();
-  };
+
+
+      
+      } else {
+    const res = await fetch("/api/articles", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        title, 
+        summary: summary || "CBM broadcast bulletin.", 
+        body: content, 
+        cover_image: coverImage || "https://unsplash.com" 
+      }),
+    });
+
+    if (res.ok) {
+      const newArticle = await res.json();
+      const updatedList = [newArticle, ...list];
+      setList(updatedList);
+      
+      // ✅ FIX: Local storage loop completely removed here as well!
+      setToast("📰 New news article published to directory live!");
+    }
+  }
+  
+  clearForm();
+};
+
 
   const startEdit = (a: Article) => {
     setEditingArticle(a);
@@ -84,7 +100,8 @@ export default function ArticlesPage() {
   const handleDelete = (id: string, itemTitle: string) => {
     const updatedList = list.filter((item) => item.id !== id);
     setList(updatedList);
-    localStorage.setItem("radio_articles", JSON.stringify(updatedList));
+    
+  
     setToast(`🗑️ News article "${itemTitle.toUpperCase()}" deleted successfully.`);
     setTimeout(() => setToast(null), 2500);
   };

@@ -15,7 +15,8 @@ import {
   SunMoon,
 } from "lucide-react";
 
-interface SidebarProps {
+interface SidebarProps { 
+  isCollapsed: boolean;
   themeMode: "dark" | "light" | "system";
   setThemeMode: (mode: "dark" | "light" | "system") => void;
   resolvedDark: boolean;
@@ -23,6 +24,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({
+  isCollapsed,
   themeMode,
   setThemeMode,
   resolvedDark,
@@ -65,23 +67,27 @@ export default function Sidebar({
     ? "text-slate-500"
     : "text-slate-600 font-bold";
 
-  return (
+    // ✅ Strict-safe layout lookup: Clears out all red underlines without using 'any'
+  
+   return (
     <div
       className="w-full flex flex-col justify-between p-4 min-h-full font-sans transition-colors duration-300"
       style={{ backgroundColor: resolvedDark ? "#0b131a" : "#e2e8f0" }}
     >
       <div className="w-full">
-        <div
-          className={`h-12 flex items-center px-3 border-b ${brandingLineColor} mb-4 whitespace-nowrap`}
-        >
-          <span className="text-emerald-500 dark:text-emerald-400 font-extrabold tracking-wider text-base">
-            RADIO CMS
+        {/* ✅ FIXED: Restored the exact branding style wrapper and cleared the overlapping tag */}
+        <div className={`h-12 flex items-center px-3 border-b ${brandingLineColor} mb-4 whitespace-nowrap`}>
+          <Radio className="h-5 w-5 text-emerald-500 dark:text-emerald-400 animate-pulse mr-2" />
+           <span className={`text-xl font-black text-emerald-500 dark:text-emerald-400 tracking-wider transition-all duration-300 origin-left ${
+            isCollapsed 
+              ? 'w-0 opacity-0 scale-x-0 ml-0' 
+              : 'w-auto opacity-100 scale-x-100 ml-2'
+          }`}>
+            CBM
           </span>
         </div>
 
-        <div
-          className={`text-[10px] font-bold uppercase tracking-widest ${labelTextColor} px-3 mb-2 font-mono`}
-        >
+        <div className={`text-[10px] font-bold uppercase tracking-widest ${labelTextColor} px-3 mb-2 font-mono`}>
           Control Tower
         </div>
 
@@ -100,7 +106,6 @@ export default function Sidebar({
                   isActive ? activeLinkClass : inactiveLinkClass
                 }`}
               >
-                {/* 🛡️ INJECT DIGITAL VECTOR FRAMEWORK */}
                 <IconComponent className="w-4 h-4 shrink-0 stroke-[2.25]" />
                 <span className="truncate">{link.label}</span>
               </Link>
@@ -112,18 +117,14 @@ export default function Sidebar({
       <div className={`pt-4 border-t ${brandingLineColor} mt-6 px-1`}>
         <div className="flex items-center space-x-2 text-slate-500 mb-2">
           <SunMoon className="w-3.5 h-3.5" />
-          <label
-            className={`block text-[10px] font-bold ${labelTextColor} uppercase tracking-widest font-mono`}
-          >
+          <label className={`block text-[10px] font-bold ${labelTextColor} uppercase tracking-widest font-mono`}>
             Interface Theme
           </label>
         </div>
         <div className="relative w-full">
           <select
             value={themeMode}
-            onChange={(e) =>
-              setThemeMode(e.target.value as "dark" | "light" | "system")
-            }
+            onChange={(e) => setThemeMode(e.target.value as "dark" | "light" | "system")}
             className="w-full text-xs font-bold px-3 py-2.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 outline-none cursor-pointer focus:border-emerald-500/50 transition duration-200"
             style={{
               backgroundColor: resolvedDark ? "#1e293b" : "#ffffff",

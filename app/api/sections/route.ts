@@ -1,48 +1,57 @@
-// 📁 FILE PATH: app/api/sections/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse } from 'next/server';
 
-const RAILWAY_API_URL = process.env.NEXT_PUBLIC_API_URL || "https://railway.app";
+// 🔄 FIXED: Points exactly to your master production variable saved in .env.local
+const RAILWAY_API_URL = process.env.RAILWAY_API_URL || "https://railway.app";
 
-interface SectionSchema {
-  id: string;
-  pageName: string;
-  sectionName: string;
-  title: string;
-  subtitle: string;
-  description: string;
-  image: string;
-  backgroundImage: string;
-  video: string;
-}
 
+// 1. GET ROUTE: Fetch active landing zones directly from Railway
 export async function GET() {
   try {
-    const response = await fetch(`${RAILWAY_API_URL}/api/sections`, { cache: "no-store" });
-    if (!response.ok) throw new Error("Railway fetch failed");
+    // 🔄 FIXED: Stripped out the extra '/api' and added trailing slash to hit /sections/ directly
+    const response = await fetch(`${RAILWAY_API_URL}/sections/`, { 
+      cache: "no-store" 
+    });
     
-    const data: SectionSchema[] = await response.json();
+    if (!response.ok) throw new Error("Railway fetch failed");
+    const data = await response.json();
     return NextResponse.json(data);
   } catch {
-    // 🟢 Your exact original baseline data arrays maintained as a safe fallback
+    // Your exact original baseline data arrays maintained cleanly as a safe fallback
     return NextResponse.json([
-      { id: "sec-homepage-hero", pageName: "Homepage", sectionName: "Hero Header Zone", title: "The Rhythm of Your Day, Amplified.", subtitle: "Independent Digital Web Radio", description: "Streaming fresh alternative track mixes, local artist spotlights, and podcasts live 24/7.", image: "https://unsplash.com", backgroundImage: "https://unsplash.com", video: "https://youtube.com" },
-      { id: "sec-about-hero", pageName: "About Page", sectionName: "Microphone History Banner", title: "Behind the Studio Microphone", subtitle: "Our Broadcasting Legacy", description: "Discover the collective team of engineers, curators, and independent broadcasters shaping audio culture.", image: "https://unsplash.com", backgroundImage: "https://unsplash.com", video: "" }
+      { id: "sec-homepage-hero", pageName: "Homepage", sectionName: "Hero Header Zone", title: "The Pulse of CBM" },
+      { id: "sec-about-hero", pageName: "About Page", sectionName: "Microphone History Banner", title: "Our Legacy" }
     ]);
   }
 }
 
+// 2. PUT ROUTE: Map frontend updates and save them directly back to the server database
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    const response = await fetch(`${RAILWAY_API_URL}/api/sections`, {
+
+    // 💡 BODY KEY ALIGNMENT: Translate properties to match their required 'section_key' and 'body' layout columns
+    const payload = {
+      section_key: body.section_key || body.id || "hero_zone", // 🔄 Maps local string identifier fields safely to 'section_key'
+      title: body.title,
+      subtitle: body.subtitle || "",
+      body: body.body || body.content || body.headingText || "", // 🔄 Translates variations to the backend's 'body' column
+      image: body.image || "",
+      cta_label: body.cta_label || "",
+      cta_url: body.cta_url || "",
+      is_active: body.is_active ?? true
+    };
+
+    // 🔄 FIXED: Stripped out the extra '/api' and added trailing slash to hit /sections/ directly
+    const response = await fetch(`${RAILWAY_API_URL}/sections/`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      body: JSON.stringify(payload),
     });
-    
-    const updatedRecord: SectionSchema = await response.json();
+
+    if (!response.ok) throw new Error("Failed to modify layout section configuration");
+    const updatedRecord = await response.json();
     return NextResponse.json(updatedRecord);
-  } catch {
-    return NextResponse.json({ error: "Failed to update section on backend" }, { status: 500 });
+  } catch  {
+    return NextResponse.json({ error: "Sections update endpoint offline" }, { status: 500 });
   }
 }

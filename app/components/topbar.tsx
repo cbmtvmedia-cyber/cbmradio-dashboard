@@ -26,16 +26,35 @@ export default function Topbar({ isCollapsed, setIsCollapsed }: TopbarProps) {
         </div>
       </div>
 
-      {/* User Information Profile */}
-      <div className="flex items-center space-x-3">
-        <div className="text-right">
-          <div className="text-xs font-semibold text-white">Alex Mercer</div>
-          <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">Station Manager</div>
-        </div>
-        <div className="w-8 h-8 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-xs font-bold text-white shadow-sm">
-          AM
-        </div>
-      </div>
+    {/* User Information Profile & Quick Logout */}
+    <div className="flex items-center space-x-3">
+  <div className="text-right">
+    <div className="text-xs font-semibold text-white">
+      {/* 🟢 SAFE CHECK: Prevents server-side compilation crashes */}
+      {typeof window !== "undefined" ? localStorage.getItem("admin_username") || "Admin User" : "Admin User"}
+    </div>
+    <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
+      Station Manager
+    </div>
+  </div>
+</div>
+
+  
+  {/* 🚪 WORKING LOGOUT ACTION BUTTON */}
+  <button 
+    onClick={() => {
+      // 🧹 Clears your browser's security gate tokens immediately
+      document.cookie = "admin_jwt_token=; path=/; max-age=0; SameSite=Strict; Secure";
+      localStorage.clear();
+      window.location.href = "/login";
+    }}
+    className="px-2.5 py-1.5 rounded bg-slate-800 border border-slate-700 hover:border-rose-500 text-[10px] font-bold text-rose-400 hover:text-rose-300 transition cursor-pointer font-mono"
+  >
+    🚪 SIGN OUT
+  </button>
+
+
+  
     </header>
   );
 }

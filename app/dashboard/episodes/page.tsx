@@ -37,7 +37,8 @@ export default function EpisodesPage() {
       .then((res) => res.json())
       .then((data) => {
         setList(data);
-        localStorage.setItem("radio_episodes", JSON.stringify(data));
+        
+        
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -47,14 +48,15 @@ export default function EpisodesPage() {
     e.preventDefault();
     if (!title || !youtubeLink) return;
     const payload = {
-      programTitle,
-      title,
-      description,
-      thumbnailImage: thumbnailImage || "https://unsplash.com",
-      youtubeLink,
-      downloadLink,
-      publishDate: publishDate || "2026-07-03",
-    };
+  // 💡 Your backend team requires these exact underscore field names:
+  program: 1, // 👈 Change this number later to a dynamic program ID drop-down value
+  title,
+  description,
+  cover_image: thumbnailImage || "https://unsplash.com",
+  youtube_link: youtubeLink,
+  download_link: downloadLink,
+  publish_date: publishDate || "2026-07-03",
+};
 
     if (editingEpisode) {
       const res = await fetch("/api/episodes", {
@@ -66,7 +68,7 @@ export default function EpisodesPage() {
         const updated = await res.json();
         const updatedList = list.map((ep) => (ep.id === updated.id ? updated : ep));
         setList(updatedList);
-        localStorage.setItem("radio_episodes", JSON.stringify(updatedList));
+        
         setToast("🎞️ Episode log entry successfully edited and updated!");
       }
     } else {
@@ -79,7 +81,7 @@ export default function EpisodesPage() {
         const newEp = await res.json();
         const updatedList = [newEp, ...list];
         setList(updatedList);
-        localStorage.setItem("radio_episodes", JSON.stringify(updatedList));
+        
         setToast("🎞️ New broadcast episode attached to parent program channel!");
       }
     }
@@ -106,7 +108,7 @@ export default function EpisodesPage() {
   const handleDelete = (id: string, name: string) => {
     const updatedList = list.filter((item) => item.id !== id);
     setList(updatedList);
-    localStorage.setItem("radio_episodes", JSON.stringify(updatedList));
+    
     setToast(`🗑️ Episode "${name}" dropped from platform logs.`);
     setTimeout(() => setToast(null), 2500);
   };

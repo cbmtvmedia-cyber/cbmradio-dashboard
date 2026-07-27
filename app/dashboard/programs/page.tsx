@@ -30,9 +30,8 @@ export default function ProgramsPage() {
     fetch("/api/programs") 
       .then((res) => res.json()) 
       .then((data) => { 
-        setList(data); 
-        // ⚡ THE SYNC: Seed initial fetch array so the home metrics counter updates on first load
-        localStorage.setItem("radio_programs", JSON.stringify(data));
+        setList(data);
+     
         setLoading(false); 
       }) 
       .catch(() => setLoading(false)); 
@@ -58,9 +57,8 @@ export default function ProgramsPage() {
       if (res.ok) { 
         const updated = await res.json(); 
         const updatedList = list.map((p) => (p.id === updated.id ? updated : p));
-        setList(updatedList); 
-        // ⚡ THE SYNC: Updates localStorage changes during modifications
-        localStorage.setItem("radio_programs", JSON.stringify(updatedList));
+        setList(updatedList);
+       
         setToast("🎙️ Radio program data fields successfully edited!"); 
       } 
     } else { 
@@ -78,9 +76,8 @@ export default function ProgramsPage() {
       if (res.ok) { 
         const newProg = await res.json(); 
         const updatedList = [newProg, ...list];
-        setList(updatedList); 
-        // ⚡ THE SYNC: Push new list into localStorage so home counters increment instantly
-        localStorage.setItem("radio_programs", JSON.stringify(updatedList));
+        setList(updatedList);
+        
         setToast("🎙️ New CBM Radio program brand channel added live!"); 
       } 
     } 
@@ -99,8 +96,7 @@ export default function ProgramsPage() {
   const handleDelete = (id: string, itemTitle: string) => { 
     const updatedList = list.filter((item) => item.id !== id);
     setList(updatedList); 
-    // ⚡ THE SYNC: Lower lengths inside cache so home screen tile drops instantly
-    localStorage.setItem("radio_programs", JSON.stringify(updatedList));
+   
     setToast( `🗑️ Show channel "${itemTitle.toUpperCase()}" deleted successfully.`, ); 
     setTimeout(() => setToast(null), 2500); 
   }; 
