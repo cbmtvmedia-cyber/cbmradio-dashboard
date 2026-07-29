@@ -9,6 +9,7 @@ interface Comment {
   targetType: "Article" | "Episode";
   targetTitle: string;
   replyText?: string;
+  status?: "Approved" | "Pending";
   timestamp: string;
 }
 
@@ -73,13 +74,22 @@ export default function CommentsPage() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleSubmitReply = (id: string, e: React.FormEvent) => {
+  const handleSubmitReply = async (id: string, e: React.FormEvent) => {
     e.preventDefault();
     if (!typedReply.trim()) return;
+    const current = list.find((comment) => comment.id === id);
+    const res = await fetch("/api/comments", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, replyText: typedReply, status: current?.status }),
+    });
+    if (!res.ok) {
+      setToast("Unable to save the administrator reply.");
+      return;
+    }
 
-    const updatedList = list.map((com) =>
-      com.id === id ? { ...com, replyText: typedReply } : com
-    );
+    const updated = await res.json();
+    const updatedList = list.map((com) => com.id === id ? updated : com);
     setList(updatedList);
   
 
@@ -89,7 +99,27 @@ export default function CommentsPage() {
     setTimeout(() => setToast(null), 2500);
   };
 
-  const handleDeleteComment = (id: string) => {
+  const handleApprove = async (comment: Comment) => {
+    const res = await fetch("/api/comments", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id: comment.id, replyText: comment.replyText, status: "Approved" }),
+    });
+    if (!res.ok) {
+      setToast("Unable to approve the comment.");
+      return;
+    }
+    const updated = await res.json();
+    setList(list.map((item) => item.id === updated.id ? updated : item));
+    setToast("Comment approved and published.");
+  };
+
+  const handleDeleteComment = async (id: string) => {
+    const res = await fetch(`/api/comments?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+      setToast("Unable to delete the comment.");
+      return;
+    }
     const updatedList = list.filter((item) => item.id !== id);
     setList(updatedList);
     // ⚡ THE SYNC: Lower lengths inside cache so home screen tile drops instantly
@@ -200,6 +230,12 @@ export default function CommentsPage() {
               )}
 
               <div className="flex justify-end items-center space-x-3 text-xs pt-1 border-t border-slate-800/40">
+                {com.status !== "Approved" && (
+                  <>
+                    <button onClick={() => handleApprove(com)} className="text-xs font-bold text-emerald-400 hover:text-emerald-300 font-sans transition cursor-pointer">Approve</button>
+                    <span className="text-slate-700 font-mono">|</span>
+                  </>
+                )}
                 {activeReplyId !== com.id ? (
                   <button onClick={() => { setActiveReplyId(com.id); setTypedReply(com.replyText || ""); }} className="text-xs font-bold text-slate-400 hover:text-emerald-400 font-sans transition cursor-pointer" > {com.replyText ? "✎ Edit Reply" : "💬 Reply to Comment"} </button>
                 ) : (

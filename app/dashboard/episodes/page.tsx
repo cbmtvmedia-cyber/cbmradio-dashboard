@@ -6,6 +6,7 @@ import Toast from "../../components/toast";
 
 interface Episode {
   id: string;
+  programId: number;
   programTitle: string;
   title: string;
   description: string;
@@ -15,8 +16,14 @@ interface Episode {
   publishDate: string;
 }
 
+interface ProgramOption {
+  id: string;
+  title: string;
+}
+
 export default function EpisodesPage() {
   const [list, setList] = useState<Episode[]>([]);
+  const [programs, setPrograms] = useState<ProgramOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingEpisode, setEditingEpisode] = useState<Episode | null>(null);
@@ -24,7 +31,7 @@ export default function EpisodesPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   // 📝 EXTRACTED FORM STATE FIELD HOOKS
-  const [programTitle, setProgramTitle] = useState("morning show");
+  const [programId, setProgramId] = useState("");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [thumbnailImage, setThumbnailImage] = useState("");
@@ -42,6 +49,14 @@ export default function EpisodesPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    fetch("/api/programs")
+      .then((res) => res.json())
+      .then((data) => {
+        const items = Array.isArray(data) ? data : data.results || [];
+        setPrograms(items);
+        if (items[0]) setProgramId(String(items[0].id));
+      })
+      .catch(() => setPrograms([]));
   }, []);
 
   const handleSave = async (e: React.FormEvent) => {
@@ -49,7 +64,7 @@ export default function EpisodesPage() {
     if (!title || !youtubeLink) return;
     const payload = {
   // 💡 Your backend team requires these exact underscore field names:
-  program: 1, // 👈 Change this number later to a dynamic program ID drop-down value
+  program_id: Number(programId),
   title,
   description,
   cover_image: thumbnailImage || "https://unsplash.com",
@@ -90,7 +105,7 @@ export default function EpisodesPage() {
 
   const startEdit = (ep: Episode) => {
     setEditingEpisode(ep);
-    setProgramTitle(ep.programTitle);
+    setProgramId(String(ep.programId));
     setTitle(ep.title);
     setDescription(ep.description);
     setThumbnailImage(ep.thumbnailImage);
@@ -105,7 +120,12 @@ export default function EpisodesPage() {
     setShowForm(true);
   };
 
-  const handleDelete = (id: string, name: string) => {
+  const handleDelete = async (id: string, name: string) => {
+    const res = await fetch(`/api/episodes?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+      setToast("Unable to delete the episode.");
+      return;
+    }
     const updatedList = list.filter((item) => item.id !== id);
     setList(updatedList);
     
@@ -120,7 +140,7 @@ export default function EpisodesPage() {
     setYoutubeLink("");
     setDownloadLink("");
     setPublishDate("");
-    setProgramTitle("morning show");
+    setProgramId(programs[0] ? String(programs[0].id) : "");
     setEditingEpisode(null);
     setShowForm(false);
     setTimeout(() => setToast(null), 2500);
@@ -153,10 +173,11 @@ export default function EpisodesPage() {
           <div className="space-y-3">
             <div>
               <label className="block text-slate-400 mb-1"> Parent Program Link * </label>
-              <select value={programTitle} onChange={(e) => setProgramTitle(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" >
-                <option value="morning show">morning show</option>
-                <option value="youth talk">youth talk</option>
-                <option value="worship hour">worship hour</option>
+              <select required value={programId} onChange={(e) => setProgramId(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" >
+                <option value="">Select a program</option>
+                {programs.map((program) => (
+                  <option key={program.id} value={program.id}>{program.title}</option>
+                ))}
               </select>
             </div>
             <div>

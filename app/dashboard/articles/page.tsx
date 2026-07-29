@@ -5,6 +5,7 @@ import Toast from "../../components/toast";
 
 interface Article {
   id: string;
+  slug: string;
   title: string;
   summary: string;
   content: string;
@@ -47,7 +48,7 @@ export default function ArticlesPage() {
       const res = await fetch("/api/articles", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingArticle.id, title, summary, body: content, cover_image: coverImage, status }),
+        body: JSON.stringify({ slug: editingArticle.slug, title, summary, body: content, cover_image: coverImage, status }),
 
       });
           if (res.ok) {
@@ -97,7 +98,12 @@ export default function ArticlesPage() {
     setShowForm(true);
   };
 
-  const handleDelete = (id: string, itemTitle: string) => {
+  const handleDelete = async (id: string, slug: string, itemTitle: string) => {
+    const res = await fetch(`/api/articles?slug=${encodeURIComponent(slug)}`, { method: "DELETE" });
+    if (!res.ok) {
+      setToast("Unable to delete the article.");
+      return;
+    }
     const updatedList = list.filter((item) => item.id !== id);
     setList(updatedList);
     
@@ -191,7 +197,7 @@ export default function ArticlesPage() {
                 <div className="flex items-center justify-end space-x-3 pt-2 border-t border-slate-800/60 font-bold text-xs">
                   <button onClick={() => startEdit(art)} className="text-slate-400 hover:text-emerald-400 transition">Edit</button>
                   <span className="text-slate-800">|</span>
-                  <button onClick={() => handleDelete(art.id, art.title)} className="text-rose-500 hover:text-rose-400 transition">Delete</button>
+                  <button onClick={() => handleDelete(art.id, art.slug, art.title)} className="text-rose-500 hover:text-rose-400 transition">Delete</button>
                 </div>
               </div>
             </div>

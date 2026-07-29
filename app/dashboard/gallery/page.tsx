@@ -1,232 +1,251 @@
-// 📁 FILE PATH: app/dashboard/gallery/page.tsx - BLOCK 1 OF 2
 "use client";
-import React, { useEffect, useState } from "react";
+
 import Image from "next/image";
+import { useEffect, useMemo, useState } from "react";
 import Toast from "../../components/toast";
+
+type GalleryCategory = "Photos" | "Studio" | "Community";
 
 interface GalleryItem {
   id: string;
+  title?: string;
   caption: string;
   url: string;
-  category: "Photos" | "Videos" | "Studio" | "Community";
-  youtubeLink?: string;
+  externalUrl?: string;
+  category: GalleryCategory;
+}
+
+function extractError(data: unknown): string {
+  if (!data || typeof data !== "object") return "The gallery item could not be saved.";
+  const values = Object.values(data as Record<string, unknown>);
+  for (const value of values) {
+    if (typeof value === "string") return value;
+    if (Array.isArray(value) && typeof value[0] === "string") return value[0];
+    if (value && typeof value === "object") {
+      const nested: string = extractError(value);
+      if (nested) return nested;
+    }
+  }
+  return "The gallery item could not be saved.";
 }
 
 export default function GalleryPage() {
   const [list, setList] = useState<GalleryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
+  const [selectedCategory, setSelectedCategory] = useState<"All" | GalleryCategory>("All");
+  const [editingItem, setEditingItem] = useState<GalleryItem | null>(null);
+  const [caption, setCaption] = useState("");
+  const [externalUrl, setExternalUrl] = useState("");
+  const [category, setCategory] = useState<GalleryCategory>("Photos");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState("");
+  const [formError, setFormError] = useState("");
   const [toast, setToast] = useState<string | null>(null);
 
-  // 📝 SPECIFICATION INPUT FIELDS STATES
-  const [caption, setCaption] = useState("");
-  const [url, setUrl] = useState("");
-  const [category, setCategory] = useState<GalleryItem["category"]>("Photos");
-  const [youtubeLink, setYoutubeLink] = useState("");
-
-  // 📁 UPDATE THIS EXACT HOOK INSIDE: app/dashboard/gallery/page.tsx
-  useEffect(() => { 
-    fetch("/api/gallery") 
-      .then((res) => res.json()) 
-      .then((serverData) => { 
-        const serverItems = Array.isArray(serverData) ? serverData : serverData.results || [];
-        // 🧠 HYDRATION SYNC LOADER: Check if browser cache memory has local uploads
-        if (typeof window !== "undefined") {
-          const cachedLocalData = localStorage.getItem("gallery_data") || localStorage.getItem("radio_gallery ");
-          if (cachedLocalData) {
-            try {
-              const parsedLocal = JSON.parse(cachedLocalData);
-              // ⚡ THE PERMANENT LOCK: If local items exist, preserve them on your screen!
-              if (Array.isArray(parsedLocal) && parsedLocal.length >= serverItems.length) {
-                setList(parsedLocal);
-                setLoading(false);
-                return;
-              }
-            } catch {
-              // Fail-safe wrapper context
-            }
-          }
-        }
-        
-        // Baseline fallback path if no cache exists yet
-        setList(serverItems);
-     
-        setLoading(false); 
-      }) 
-      .catch(() => setLoading(false)); 
+  useEffect(() => {
+    fetch("/api/gallery")
+      .then(async (response) => {
+        if (!response.ok) throw new Error("Gallery request failed");
+        return response.json();
+      })
+      .then((data) => setList(Array.isArray(data) ? data : data.results || []))
+      .catch(() => setToast("Unable to load gallery records."))
+      .finally(() => setLoading(false));
   }, []);
 
-
-  
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!caption.trim() || !url.trim()) return;
-
-    // 🟢 THE FIX: Replaced impure Math.random() with a stable, predictable sequential list index ID string
-    const targetSequentialId = `gal-${list.length + 1}`;
-
-    const localNewMedia: GalleryItem = {
-      id: targetSequentialId,
-      caption: caption.trim(),
-      url: url.trim(),
-      category: category,
-      youtubeLink: category === "Videos" ? youtubeLink.trim() : "",
-    };
-
-    try {
-      const res = await fetch("/api/gallery", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-      title: caption.trim(), // 💡 Map caption to 'title' if they use title for the main header
-      caption: caption.trim(),
-      image: url.trim(), // 🔄 CHANGED: Use 'image' instead of 'url'
-      category: category,
-      youtube_link: category === "Videos" ? youtubeLink.trim() : "",
-        
-        }),
-      });
-
-    
-      if (res.ok) {
-        const serverResponseData = await res.json();
-        const validatedAsset = serverResponseData && typeof serverResponseData === "object" && serverResponseData.id 
-          ? serverResponseData 
-          : localNewMedia;
-
-        const updatedList = [validatedAsset, ...list];
-        setList(updatedList);
-        
-        executeFormReset();
-        return;
-      }
-    } catch (error) {
-      console.warn("API route unavailable or rejected request. Syncing locally. Log details:", error);
-    }
-
-    const localUpdatedList = [localNewMedia, ...list];
-    setList(localUpdatedList);
-    executeFormReset();
-  };
-
-  const handleDelete = (id: string) => {
-    const updatedList = list.filter((item) => item.id !== id);
-    setList(updatedList);
-    
-    setToast("🗑️ Media file deleted from admin catalog.");
-    setTimeout(() => setToast(null), 2500);
-  };
-
-  const executeFormReset = () => {
-    setCaption("");
-    setUrl("");
-    setYoutubeLink("");
-    setCategory("Photos");
-    setShowForm(false);
-    setToast("🖼️ Media element successfully published to website gallery!");
-    setTimeout(() => setToast(null), 2500);
-  };
-
-    if (loading) return (
-    <div className="p-4 text-xs text-slate-500 animate-pulse">
-      📡 Loading Station Gallery Media...
-    </div>
+  useEffect(
+    () => () => {
+      if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+    },
+    [filePreviewUrl],
   );
 
-  // 🟢 THE HYDRATION PROTECTOR FIX: Prevents empty state flashes on browser refresh
-  const isServerHydrating = typeof window === "undefined" || list.length === 0;
-  
-  const filteredList = isServerHydrating 
-    ? list 
-    : (selectedCategory === "All" ? list : list.filter((item) => item.category === selectedCategory));
+  const previewUrl = filePreviewUrl || editingItem?.url || externalUrl;
 
-  const categoriesList = ["All", "Photos", "Videos", "Studio", "Community"] as const;
+  const filteredList = useMemo(
+    () => selectedCategory === "All"
+      ? list
+      : list.filter((item) => item.category === selectedCategory),
+    [list, selectedCategory],
+  );
+
+  const resetForm = () => {
+    setCaption("");
+    setExternalUrl("");
+    setCategory("Photos");
+    setSelectedFile(null);
+    setFilePreviewUrl("");
+    setEditingItem(null);
+    setFormError("");
+    setShowForm(false);
+  };
+
+  const startEdit = (item: GalleryItem) => {
+    setEditingItem(item);
+    setCaption(item.caption);
+    setExternalUrl(item.externalUrl || "");
+    setCategory(item.category);
+    setSelectedFile(null);
+    setFilePreviewUrl("");
+    setFormError("");
+    setShowForm(true);
+  };
+
+  const handleSave = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setFormError("");
+    if (!caption.trim() || (!selectedFile && !externalUrl.trim() && !editingItem)) {
+      setFormError("Add a caption and select an image file or external URL.");
+      return;
+    }
+
+    const form = new FormData();
+    if (editingItem) form.set("id", editingItem.id);
+    form.set("title", caption.trim());
+    form.set("caption", caption.trim());
+    form.set("category", category);
+    if (selectedFile) form.set("uploaded_image", selectedFile);
+    if (externalUrl.trim()) form.set("image", externalUrl.trim());
+
+    try {
+      const response = await fetch("/api/gallery", {
+        method: editingItem ? "PUT" : "POST",
+        body: form,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setFormError(extractError(data));
+        return;
+      }
+
+      setList((items) => editingItem
+        ? items.map((item) => item.id === data.id ? data : item)
+        : [data, ...items]);
+      setToast(editingItem ? "Gallery image updated." : "Gallery image uploaded.");
+      resetForm();
+    } catch {
+      setFormError("The gallery service could not be reached.");
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    const response = await fetch(`/api/gallery?id=${encodeURIComponent(id)}`, {
+      method: "DELETE",
+    });
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({}));
+      setToast(extractError(data));
+      return;
+    }
+    setList((items) => items.filter((item) => item.id !== id));
+    setToast("Gallery image deleted.");
+  };
+
+  if (loading) {
+    return <div className="p-4 text-xs text-slate-500 animate-pulse">Loading gallery media…</div>;
+  }
 
   return (
     <div className="space-y-6 view-fade">
-
-  
       <Toast message={toast} />
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
+      <div className="flex flex-col gap-4 border-b border-slate-800 pb-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white uppercase tracking-wider"> Media Gallery Hub </h1>
-          <p className="text-xs text-slate-400 mt-0.5"> Manage photos, video thumbnails, and studio media displayed on the website. </p>
+          <h1 className="text-xl font-bold text-white uppercase tracking-wider">Media Gallery</h1>
+          <p className="mt-0.5 text-xs text-slate-400">Upload and manage website gallery images.</p>
         </div>
-        <button onClick={() => setShowForm(!showForm)} className="px-3 py-1.5 bg-emerald-500 text-slate-950 text-xs font-bold rounded-md cursor-pointer tracking-wide self-start sm:self-center" >
-          {showForm ? "✕ Dismiss" : "＋ Upload Media"}
+        <button
+          onClick={() => showForm ? resetForm() : setShowForm(true)}
+          className="self-start rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-bold text-slate-950 sm:self-center"
+        >
+          {showForm ? "Dismiss" : "Upload image"}
         </button>
       </div>
 
-      {/* DYNAMIC SPECIFICATION CATEGORIES FILTER CONTROLS */}
-      <div className="flex flex-wrap gap-2 pt-1">
-        {categoriesList.map((cat) => (
-          <button key={cat} onClick={() => setSelectedCategory(cat)} className={`px-3 py-1 rounded-full text-xs font-medium transition cursor-pointer border ${selectedCategory === cat ? "bg-emerald-500 text-slate-950 border-emerald-500 font-bold" : "bg-slate-900 text-slate-400 border-slate-800 hover:text-white"}`} >
-            {cat}
+      <div className="flex flex-wrap gap-2">
+        {(["All", "Photos", "Studio", "Community"] as const).map((item) => (
+          <button
+            key={item}
+            onClick={() => setSelectedCategory(item)}
+            className={`rounded-full border px-3 py-1 text-xs ${
+              selectedCategory === item
+                ? "border-emerald-500 bg-emerald-500 font-bold text-slate-950"
+                : "border-slate-800 bg-slate-900 text-slate-400"
+            }`}
+          >
+            {item}
           </button>
         ))}
       </div>
 
       {showForm && (
-        <form onSubmit={handleSave} className="bg-slate-900 border border-slate-800 rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs form-slide" >
+        <form onSubmit={handleSave} className="grid grid-cols-1 gap-4 rounded-xl border border-slate-800 bg-slate-900 p-5 text-xs md:grid-cols-2">
           <div className="space-y-3">
-            <div>
-              <label className="block text-slate-400 mb-1"> Media Caption Label * </label>
-              <input type="text" required value={caption} onChange={(e) => setCaption(e.target.value)} placeholder="e.g. Studio Mic Setup B" className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" />
-            </div>
-            <div>
-              <label className="block text-slate-400 mb-1"> Photo / Video Thumbnail URL Link * </label>
-              <input type="text" required value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://unsplash.com..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none font-mono" />
-            </div>
+            <label className="block text-slate-400">
+              Caption *
+              <input required value={caption} onChange={(event) => setCaption(event.target.value)} className="mt-1 w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-white outline-none" />
+            </label>
+            <label className="block text-slate-400">
+              Local image file
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp,image/gif"
+                onChange={(event) => {
+                  const file = event.target.files?.[0] || null;
+                  setSelectedFile(file);
+                  setFilePreviewUrl(file ? URL.createObjectURL(file) : "");
+                }}
+                className="mt-1 w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-white"
+              />
+              <span className="mt-1 block text-[10px] text-slate-500">JPEG, PNG, WebP, or GIF; maximum 5 MB.</span>
+            </label>
+            <label className="block text-slate-400">
+              External image URL
+              <input type="url" value={externalUrl} onChange={(event) => setExternalUrl(event.target.value)} placeholder="Optional legacy/external URL" className="mt-1 w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 font-mono text-white outline-none" />
+            </label>
           </div>
-          <div className="space-y-3 flex flex-col justify-between">
-            <div>
-              <label className="block text-slate-400 mb-1"> Target Category Blueprint * </label>
-              <select value={category} onChange={(e) => setCategory(e.target.value as "Photos" | "Videos" | "Studio" | "Community")} className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" >
-                <option value="Photos">Photos Collection</option>
-                <option value="Videos">Videos Collection</option>
-                <option value="Studio">Studio Behind-the-Scenes</option>
-                <option value="Community">Community Events</option>
+          <div className="flex flex-col gap-3">
+            <label className="block text-slate-400">
+              Category
+              <select value={category} onChange={(event) => setCategory(event.target.value as GalleryCategory)} className="mt-1 w-full rounded border border-slate-800 bg-slate-950 px-3 py-2 text-white">
+                <option value="Photos">Photos</option>
+                <option value="Studio">Studio</option>
+                <option value="Community">Community</option>
               </select>
-            </div>
-            {category === "Videos" && (
-              <div>
-                <label className="block text-slate-400 mb-1 text-rose-400 font-medium animate-pulse"> Attached YouTube Video URL * </label>
-                <input type="url" required value={youtubeLink} onChange={(e) => setYoutubeLink(e.target.value)} placeholder="https://youtube.com..." className="w-full bg-slate-950 border-rose-500/40 border rounded px-3 py-2 text-white outline-none font-mono" />
+            </label>
+            {previewUrl && (
+              <div className="relative aspect-video overflow-hidden rounded border border-slate-800 bg-slate-950">
+                <Image src={previewUrl} alt="Selected image preview" fill unoptimized className="object-cover" />
               </div>
             )}
-            <button type="submit" className="w-full py-2 bg-emerald-500 text-slate-950 font-bold rounded-md cursor-pointer uppercase tracking-wider" > Save Gallery Asset </button>
+            {editingItem && !selectedFile && (
+              <p className="text-[10px] text-slate-500">The current uploaded image will be kept unless you select a replacement.</p>
+            )}
+            {formError && <p className="text-rose-400">{formError}</p>}
+            <button type="submit" className="mt-auto w-full rounded-md bg-emerald-500 py-2 font-bold uppercase tracking-wider text-slate-950">
+              {editingItem ? "Update gallery image" : "Save gallery image"}
+            </button>
           </div>
         </form>
       )}
 
-      {/* THE RENDERED RESPONSIVE GALLERY MEDIA VISUAL CARDS GRID */}
       {filteredList.length === 0 ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-xs text-slate-500 font-mono tracking-wide animate-pulse"> 📡 No active gallery media items match this category filter. </div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-8 text-center text-xs text-slate-500">No gallery images match this filter.</div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6">
-          {filteredList.map((media) => (
-            <div key={media.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-md group flex flex-col hover:border-slate-700 transition" >
-              <div className="relative aspect-video w-full bg-slate-950 border-b border-slate-800 shrink-0">
-                <Image src={media.url || "https://unsplash.com"} alt={media.caption} fill className="w-full h-full object-cover transition duration-300 group-hover:scale-105" />
-                <span className="absolute top-2 left-2 bg-slate-950/80 border border-slate-800 text-slate-300 font-extrabold uppercase px-2 py-0.5 rounded text-[9px] tracking-wider font-mono"> {media.category} </span>
-                {media.category === "Videos" && (
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center pointer-events-none">
-                    <span className="text-2xl">▶️</span>
-                  </div>
-                )}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          {filteredList.map((item) => (
+            <div key={item.id} className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900">
+              <div className="relative aspect-video bg-slate-950">
+                <Image src={item.url} alt={item.caption} fill unoptimized className="object-cover" />
               </div>
-              <div className="p-4 flex-1 flex flex-col justify-between space-y-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold text-white tracking-wide truncate"> {media.caption} </p>
-                  {media.youtubeLink && (
-                    <div className="mt-1.5 text-[10px] truncate max-w-xs font-mono text-rose-400">
-                      <a href={media.youtubeLink} target="_blank" rel="noreferrer" className="hover:underline" > 📺 Connected Video Link </a>
-                    </div>
-                  )}
+              <div className="space-y-3 p-4">
+                <div>
+                  <p className="truncate text-xs font-semibold text-white">{item.caption}</p>
+                  <p className="mt-1 text-[10px] uppercase tracking-wider text-slate-500">{item.category}</p>
                 </div>
-                <div className="flex justify-end pt-1">
-                  <button onClick={() => handleDelete(media.id)} className="px-3 py-1 rounded bg-rose-500/10 hover:bg-rose-500 text-rose-400 hover:text-white border border-rose-500/20 text-[10px] font-bold transition cursor-pointer uppercase tracking-wider" > Delete Media </button>
+                <div className="flex justify-end gap-2">
+                  <button onClick={() => startEdit(item)} className="rounded border border-slate-700 bg-slate-800 px-3 py-1 text-[10px] font-bold uppercase text-slate-300">Edit</button>
+                  <button onClick={() => handleDelete(item.id)} className="rounded border border-rose-500/20 bg-rose-500/10 px-3 py-1 text-[10px] font-bold uppercase text-rose-400">Delete</button>
                 </div>
               </div>
             </div>

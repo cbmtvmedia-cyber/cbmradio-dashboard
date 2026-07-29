@@ -1,99 +1,51 @@
-import { NextResponse } from 'next/server';
-import {
-  BACKEND_API_V1_URL,
-  backendAuthFailure,
-  getBackendAuthHeaders,
-  unauthorizedResponse,
-} from "../../lib/backend-auth";
+import { asRecord, bool, forwardBackendResponse, number, requestError, text } from "../../lib/backend-api";
+import { BACKEND_API_V1_URL, getBackendAuthHeaders, unauthorizedResponse } from "../../lib/backend-auth";
 
-// 1. GET ROUTE: Fetch live paginated list from Railway
+function toEpisode(item: Record<string, unknown>) {
+  return {
+    ...item, id: String(item.id ?? ""), programId: item.program_id,
+    programTitle: text(item.program_title), thumbnailImage: text(item.cover_image),
+    youtubeLink: text(item.youtube_link), publishDate: text(item.publish_date),
+  };
+}
+function payload(body: Record<string, unknown>) {
+  return {
+    program_id: number(body.program_id ?? body.programId ?? body.program),
+    title: text(body.title), description: text(body.description),
+    cover_image: text(body.cover_image, text(body.thumbnailImage)),
+    youtube_link: text(body.youtube_link, text(body.youtubeLink)),
+    publish_date: text(body.publish_date, text(body.publishDate)) || null,
+    is_featured: bool(body.is_featured), is_active: body.is_active !== false,
+  };
+}
+async function mutate(request: Request, method: "POST" | "PATCH") {
+  const headers = await getBackendAuthHeaders(true);
+  if (!headers) return unauthorizedResponse();
+  const body = asRecord(await request.json().catch(() => null));
+  const data = payload(body);
+  if (!data.program_id) return requestError("A valid program is required.");
+  if (!data.title) return requestError("Episode title is required.");
+  const id = method === "PATCH" ? String(body.id ?? "") : "";
+  if (method === "PATCH" && !id) return requestError("Episode id is required.");
+  try {
+    return forwardBackendResponse(await fetch(`${BACKEND_API_V1_URL}/episodes/${id ? `${id}/` : ""}`, {
+      method, headers, body: JSON.stringify(data),
+    }), toEpisode);
+  } catch { return requestError("Unable to reach the episodes service.", 502); }
+}
 export async function GET() {
   const headers = await getBackendAuthHeaders();
   if (!headers) return unauthorizedResponse();
-
-  try {
-    // 🔄 UPDATED PATH: Hits /episodes/ directly based on documentation page 7
-    const response = await fetch(`${BACKEND_API_V1_URL}/episodes/`, {
-      headers,
-      cache: "no-store" 
-    });
-    
-    const authFailure = await backendAuthFailure(response);
-    if (authFailure) return authFailure;
-    if (!response.ok) throw new Error("Railway fetch failed");
-    const data = await response.json();
-    return NextResponse.json(data);
-  } catch  {
-    // Fallback data loop stays perfectly intact
-    return NextResponse.json([
-      { id: "ep-1", programTitle: "youth talk", title: "Freelancing Without Burnout", description: "Learn how" },
-      { id: "ep-2", programTitle: "morning show", title: "Live Studio Session Mix", description: "An exclusi" }
-    ]);
-  }
+  try { return forwardBackendResponse(await fetch(`${BACKEND_API_V1_URL}/episodes/`, { headers, cache: "no-store" }), toEpisode); }
+  catch { return requestError("Unable to reach the episodes service.", 502); }
 }
-
-// 2. POST ROUTE: Receive from frontend page form and save permanently to Railway
-export async function POST(request: Request) {
-  const headers = await getBackendAuthHeaders(true);
+export async function POST(request: Request) { return mutate(request, "POST"); }
+export async function PUT(request: Request) { return mutate(request, "PATCH"); }
+export async function DELETE(request: Request) {
+  const headers = await getBackendAuthHeaders();
   if (!headers) return unauthorizedResponse();
-
-  try {
-    const incomingData = await request.json();
-
-    // 💡 BODY KEY ALIGNMENT: Unpack and translate fields to match their database layout rules
-    const formattedPayload = {
-      program: incomingData.program || 1, // Connects the episode to a parent program ID number
-      title: incomingData.title,
-      description: incomingData.description,
-      cover_image: incomingData.cover_image || "https://unsplash.com",
-      youtube_link: incomingData.youtube_link || "",
-      download_link: incomingData.download_link || "",
-      publish_date: incomingData.publish_date || "2026-07-03"
-    };
-
-    // 🔄 UPDATED PATH: Sends payload securely down their production endpoint
-    const response = await fetch(`${BACKEND_API_V1_URL}/episodes/`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(formattedPayload),
-    });
-
-    const authFailure = await backendAuthFailure(response);
-    if (authFailure) return authFailure;
-    if (!response.ok) throw new Error("Failed to create episode on backend");
-    const finalSavedData = await response.json();
-    
-    return NextResponse.json(finalSavedData);
-  } catch {
-    return NextResponse.json({ error: "Authentication or saving endpoint offline" }, { status: 500 });
-  }
-}
-
-export async function PUT(request: Request) {
-  const headers = await getBackendAuthHeaders(true);
-  if (!headers) return unauthorizedResponse();
-
-  try {
-    const incomingData = await request.json();
-    const formattedPayload = {
-      program: incomingData.program || 1,
-      title: incomingData.title,
-      description: incomingData.description,
-      cover_image: incomingData.cover_image || "",
-      youtube_link: incomingData.youtube_link || "",
-      download_link: incomingData.download_link || "",
-      publish_date: incomingData.publish_date,
-    };
-    const response = await fetch(`${BACKEND_API_V1_URL}/episodes/${incomingData.id}/`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify(formattedPayload),
-    });
-    const authFailure = await backendAuthFailure(response);
-    if (authFailure) return authFailure;
-    if (!response.ok) throw new Error("Failed to update episode");
-    return NextResponse.json(await response.json());
-  } catch {
-    return NextResponse.json({ error: "Episodes update endpoint offline" }, { status: 500 });
-  }
+  const id = new URL(request.url).searchParams.get("id");
+  if (!id) return requestError("Episode id is required.");
+  try { return forwardBackendResponse(await fetch(`${BACKEND_API_V1_URL}/episodes/${encodeURIComponent(id)}/`, { method: "DELETE", headers })); }
+  catch { return requestError("Unable to reach the episodes service.", 502); }
 }

@@ -1,106 +1,111 @@
-import { NextResponse } from 'next/server';
+import {
+  asRecord,
+  bool,
+  forwardBackendResponse,
+  requestError,
+  text,
+} from "../../lib/backend-api";
 import {
   BACKEND_API_V1_URL,
-  backendAuthFailure,
   getBackendAuthHeaders,
   unauthorizedResponse,
 } from "../../lib/backend-auth";
 
-// 🔄 UPDATED: Points exactly to your master production variable saved in .env.local
-// 1. GET ROUTE: Fetch articles list directly from Railway
+function toArticle(item: Record<string, unknown>) {
+  const body = text(item.body);
+  return {
+    ...item,
+    id: String(item.id ?? ""),
+    summary: body.slice(0, 180),
+    content: body,
+    coverImage: text(item.cover_image),
+    status: bool(item.is_published) ? "Published" : "Draft",
+  };
+}
+
+function articlePayload(body: Record<string, unknown>) {
+  const status = text(body.status);
+  return {
+    title: text(body.title),
+    body: text(body.body, text(body.content)),
+    cover_image: text(body.cover_image, text(body.coverImage)),
+    author: text(body.author, "CBM Radio"),
+    is_published: status ? status === "Published" : bool(body.is_published),
+    is_featured: bool(body.is_featured),
+    published_at:
+      status === "Published" || bool(body.is_published)
+        ? text(body.published_at, new Date().toISOString())
+        : null,
+  };
+}
+
 export async function GET() {
   const headers = await getBackendAuthHeaders();
   if (!headers) return unauthorizedResponse();
-
   try {
-    const response = await fetch(`${BACKEND_API_V1_URL}/articles/`, {
-      headers,
-      cache: "no-store" 
-    });
-    
-    const authFailure = await backendAuthFailure(response);
-    if (authFailure) return authFailure;
-    if (!response.ok) throw new Error("Railway fetch failed");
-    const data = await response.json();
-    return NextResponse.json(data);
+    return forwardBackendResponse(
+      await fetch(`${BACKEND_API_V1_URL}/articles/`, { headers, cache: "no-store" }),
+      toArticle,
+    );
   } catch {
-    // Clean fallback to keep UI perfectly safe if backend sync drops
-    return NextResponse.json({
-      results: [
-        {
-          id: "art-1",
-          title: "Station Launches New Morning Grid Slot",
-          summary: "CBM Radio upgrades its live broadcast studio blocks this summer season.",
-          body: "Full text content regarding the morning schedule slot expansion...",
-          status: "Published"
-        }
-      ]
-    });
+    return requestError("Unable to reach the articles service.", 502);
   }
 }
 
-// 2. POST ROUTE: Receive new articles from your frontend page form
 export async function POST(request: Request) {
   const headers = await getBackendAuthHeaders(true);
   if (!headers) return unauthorizedResponse();
-
+  const body = asRecord(await request.json().catch(() => null));
+  if (!text(body.title) || !text(body.body, text(body.content))) {
+    return requestError("Article title and content are required.");
+  }
   try {
-    const incomingData = await request.json();
-
-    const formattedPayload = {
-      title: incomingData.title,
-      summary: incomingData.summary,
-      body: incomingData.body || incomingData.content || "", 
-      cover_image: incomingData.cover_image || incomingData.coverImage || "https://unsplash.com", 
-      status: incomingData.status || "Published",
-    };
-
-    const response = await fetch(`${BACKEND_API_V1_URL}/articles/`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(formattedPayload),
-    });
-
-    const authFailure = await backendAuthFailure(response);
-    if (authFailure) return authFailure;
-    if (!response.ok) throw new Error("Failed to create article on backend");
-    const finalSavedData = await response.json();
-    
-    return NextResponse.json(finalSavedData);
-  } catch  {
-    return NextResponse.json({ error: "Articles post endpoint offline" }, { status: 500 });
+    return forwardBackendResponse(
+      await fetch(`${BACKEND_API_V1_URL}/articles/`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(articlePayload(body)),
+      }),
+      toArticle,
+    );
+  } catch {
+    return requestError("Unable to reach the articles service.", 502);
   }
 }
 
-// 3. PUT ROUTE: Receive edited updates from your frontend handleSave blocks
 export async function PUT(request: Request) {
   const headers = await getBackendAuthHeaders(true);
   if (!headers) return unauthorizedResponse();
-
+  const body = asRecord(await request.json().catch(() => null));
+  const slug = text(body.slug);
+  if (!slug) return requestError("Article slug is required for updates.");
   try {
-    const incomingData = await request.json();
+    return forwardBackendResponse(
+      await fetch(`${BACKEND_API_V1_URL}/articles/${encodeURIComponent(slug)}/`, {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify(articlePayload(body)),
+      }),
+      toArticle,
+    );
+  } catch {
+    return requestError("Unable to reach the articles service.", 502);
+  }
+}
 
-    const formattedPayload = {
-      title: incomingData.title,
-      summary: incomingData.summary,
-      body: incomingData.body || incomingData.content || "",
-      cover_image: incomingData.cover_image || incomingData.coverImage || "https://unsplash.com",
-      status: incomingData.status || "Published",
-    };
-
-    const response = await fetch(`${BACKEND_API_V1_URL}/articles/${incomingData.id}/`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify(formattedPayload),
-    });
-
-    const authFailure = await backendAuthFailure(response);
-    if (authFailure) return authFailure;
-    if (!response.ok) throw new Error("Failed to update article on backend");
-    const finalSavedData = await response.json();
-    
-    return NextResponse.json(finalSavedData);
-  } catch{
-    return NextResponse.json({ error: "Articles update endpoint offline" }, { status: 500 });
+export async function DELETE(request: Request) {
+  const headers = await getBackendAuthHeaders();
+  if (!headers) return unauthorizedResponse();
+  const slug = new URL(request.url).searchParams.get("slug");
+  if (!slug) return requestError("Article slug is required.");
+  try {
+    return forwardBackendResponse(
+      await fetch(`${BACKEND_API_V1_URL}/articles/${encodeURIComponent(slug)}/`, {
+        method: "DELETE",
+        headers,
+      }),
+    );
+  } catch {
+    return requestError("Unable to reach the articles service.", 502);
   }
 }

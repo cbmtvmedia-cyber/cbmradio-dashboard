@@ -93,7 +93,12 @@ export default function ProgramsPage() {
     setShowForm(true); 
   }; 
 
-  const handleDelete = (id: string, itemTitle: string) => { 
+  const handleDelete = async (id: string, itemTitle: string) => {
+    const res = await fetch(`/api/programs?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+      setToast("Unable to delete the program.");
+      return;
+    }
     const updatedList = list.filter((item) => item.id !== id);
     setList(updatedList); 
    

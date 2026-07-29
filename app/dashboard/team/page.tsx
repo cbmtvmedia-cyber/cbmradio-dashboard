@@ -97,7 +97,12 @@ export default function TeamPage() {
     setShowForm(true);
   };
 
-  const handleDelete = (id: string, memberName: string) => {
+  const handleDelete = async (id: string, memberName: string) => {
+    const res = await fetch(`/api/team?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    if (!res.ok) {
+      setToast("Unable to delete the team member.");
+      return;
+    }
     const updatedList = list.filter((item) => item.id !== id);
     setList(updatedList);
     
