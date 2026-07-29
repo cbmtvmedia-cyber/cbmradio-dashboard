@@ -34,7 +34,7 @@ export default function PageSectionsPage() {
     fetch("/api/sections")
       .then((res) => res.json())
       .then((data) => {
-        setList(data);
+        setList(Array.isArray(data) ? data : data.results || []);
        
         setLoading(false);
       })

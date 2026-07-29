@@ -10,6 +10,8 @@ export const AUTH_API_BASE_URL = (
   "https://railway.app"
 ).replace(/\/$/, "");
 
+export const BACKEND_API_V1_URL = `${AUTH_API_BASE_URL}/api/v1`;
+
 export type AdminUser = {
   id: number;
   username: string;

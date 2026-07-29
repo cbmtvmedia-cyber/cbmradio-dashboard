@@ -1,78 +1,74 @@
-import { NextResponse } from 'next/server';
+import { NextResponse } from "next/server";
 import {
+  BACKEND_API_V1_URL,
   backendAuthFailure,
   getBackendAuthHeaders,
   unauthorizedResponse,
 } from "../../lib/backend-auth";
 
-// 🔄 FIXED: Uses your master production environment variable from your .env.local file
-const RAILWAY_API_URL = process.env.RAILWAY_API_URL || "https://railway.app";
+function formatProgram(body: Record<string, unknown>) {
+  return {
+    title: body.title,
+    description: body.description || "",
+    cover_image: body.cover_image || body.coverImage || "",
+    presenter: body.presenter,
+  };
+}
 
-// 1. GET ROUTE: Fetch active homepage zones directly from Railway
 export async function GET() {
   const headers = await getBackendAuthHeaders();
   if (!headers) return unauthorizedResponse();
 
   try {
-    // 🔄 FIXED: Stripped out the extra '/api' and added trailing slash to hit /sections/ directly
-    const response = await fetch(`${RAILWAY_API_URL}/sections/`, { 
+    const response = await fetch(`${BACKEND_API_V1_URL}/programs/`, {
       headers,
-      cache: "no-store" 
+      cache: "no-store",
     });
-    
     const authFailure = await backendAuthFailure(response);
     if (authFailure) return authFailure;
-    if (!response.ok) throw new Error("Railway fetch failed");
-    const data = await response.json();
-    return NextResponse.json(data);
-  } catch  {
-    // Clean paginated fallback layout structure to keep frontend safe from drops
-    return NextResponse.json({
-      results: [
-        { 
-          section_key: "hero_zone", 
-          title: "CBM Broadcast Control Center", 
-          subtitle: "Live Airwaves Hub", 
-          body: "Active static landing sections description logs." 
-        }
-      ]
-    });
+    if (!response.ok) throw new Error("Backend programs fetch failed");
+    return NextResponse.json(await response.json());
+  } catch {
+    return NextResponse.json({ results: [] });
   }
 }
 
-// 2. PUT ROUTE: Receive text content updates from your page forms and push to Railway
+export async function POST(request: Request) {
+  const headers = await getBackendAuthHeaders(true);
+  if (!headers) return unauthorizedResponse();
+
+  try {
+    const body = await request.json();
+    const response = await fetch(`${BACKEND_API_V1_URL}/programs/`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(formatProgram(body)),
+    });
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
+    if (!response.ok) throw new Error("Failed to create program");
+    return NextResponse.json(await response.json());
+  } catch {
+    return NextResponse.json({ error: "Programs post endpoint offline" }, { status: 500 });
+  }
+}
+
 export async function PUT(request: Request) {
   const headers = await getBackendAuthHeaders(true);
   if (!headers) return unauthorizedResponse();
 
   try {
     const body = await request.json();
-    
-    // 💡 FIELD ALIGNMENT: Unpack and translate incoming options to fulfill unique key schema needs
-    const payload = {
-      section_key: body.section_key || body.id || "hero_zone", // 🔄 Maps local string identifier fields safely to 'section_key'
-      title: body.title,
-      subtitle: body.subtitle || "",
-      body: body.body || body.content || body.headingText || "", // 🔄 Translates multi-case layout descriptions to 'body'
-      image: body.image || "",
-      cta_label: body.cta_label || "",
-      cta_url: body.cta_url || "",
-      is_active: body.is_active ?? true
-    };
-
-    // 🔄 FIXED: Stripped out the extra '/api' and added trailing slash to hit /sections/ directly
-    const response = await fetch(`${RAILWAY_API_URL}/sections/`, {
-      method: "PUT",
+    const response = await fetch(`${BACKEND_API_V1_URL}/programs/${body.id}/`, {
+      method: "PATCH",
       headers,
-      body: JSON.stringify(payload),
+      body: JSON.stringify(formatProgram(body)),
     });
-
     const authFailure = await backendAuthFailure(response);
     if (authFailure) return authFailure;
-    if (!response.ok) throw new Error("Failed to modify layout section configuration");
-    const data = await response.json();
-    return NextResponse.json(data);
-  } catch  {
-    return NextResponse.json({ error: "Sections update endpoint offline" }, { status: 500 });
+    if (!response.ok) throw new Error("Failed to update program");
+    return NextResponse.json(await response.json());
+  } catch {
+    return NextResponse.json({ error: "Programs update endpoint offline" }, { status: 500 });
   }
 }

@@ -1,13 +1,12 @@
 import { NextResponse } from "next/server";
 import {
+  BACKEND_API_V1_URL,
   backendAuthFailure,
   getBackendAuthHeaders,
   unauthorizedResponse,
 } from "../../lib/backend-auth";
 
 // 🔄 FIXED: Correctly points to your master production variable from your .env.local file
-const RAILWAY_API_URL = process.env.RAILWAY_API_URL || "https://railway.app";
-
 // 1. GET ROUTE: Fetch live paginated staff list directly from Railway
 export async function GET() {
   const headers = await getBackendAuthHeaders();
@@ -15,7 +14,7 @@ export async function GET() {
 
   try {
     // 🔄 FIXED: Stripped out the extra '/api' and added trailing slash to hit /team/ directly
-    const response = await fetch(`${RAILWAY_API_URL}/team/`, { 
+    const response = await fetch(`${BACKEND_API_V1_URL}/team/`, {
       headers,
       cache: "no-store" 
     });
@@ -59,7 +58,7 @@ export async function POST(request: Request) {
       is_active: body.is_active ?? true
     };
 
-    const response = await fetch(`${RAILWAY_API_URL}/team/`, {
+    const response = await fetch(`${BACKEND_API_V1_URL}/team/`, {
       method: "POST",
       headers,
       body: JSON.stringify(payload),
@@ -72,5 +71,33 @@ export async function POST(request: Request) {
     return NextResponse.json(newRecord);
   } catch  {
     return NextResponse.json({ error: "Team post endpoint offline" }, { status: 500 });
+  }
+}
+
+export async function PUT(request: Request) {
+  const headers = await getBackendAuthHeaders(true);
+  if (!headers) return unauthorizedResponse();
+
+  try {
+    const body = await request.json();
+    const payload = {
+      name: body.name,
+      role: body.role || body.position || "Presenter",
+      category: body.category || "Presenters",
+      bio: body.bio || body.biography || "",
+      photo: body.photo || body.image || "",
+      is_active: body.is_active ?? true,
+    };
+    const response = await fetch(`${BACKEND_API_V1_URL}/team/${body.id}/`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(payload),
+    });
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
+    if (!response.ok) throw new Error("Failed to update team member");
+    return NextResponse.json(await response.json());
+  } catch {
+    return NextResponse.json({ error: "Team update endpoint offline" }, { status: 500 });
   }
 }

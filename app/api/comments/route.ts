@@ -1,20 +1,19 @@
 import { NextResponse } from 'next/server';
 import {
+  BACKEND_API_V1_URL,
   backendAuthFailure,
   getBackendAuthHeaders,
   unauthorizedResponse,
 } from "../../lib/backend-auth";
 
 // 🔄 UPDATED: Points exactly to your master production variable saved in .env.local
-const RAILWAY_API_URL = process.env.RAILWAY_API_URL || "https://railway.app";
-
 // 1. GET ROUTE: Fetch live paginated comments directly from Railway
 export async function GET() {
   const headers = await getBackendAuthHeaders();
   if (!headers) return unauthorizedResponse();
 
   try {
-    const response = await fetch(`${RAILWAY_API_URL}/comments/`, { 
+    const response = await fetch(`${BACKEND_API_V1_URL}/comments/`, {
       headers,
       cache: "no-store" 
     });
@@ -56,7 +55,7 @@ export async function POST(request: Request) {
       episode: Number(incomingData.episode) || 1, 
     };
 
-    const response = await fetch(`${RAILWAY_API_URL}/comments/`, {
+    const response = await fetch(`${BACKEND_API_V1_URL}/comments/`, {
       method: "POST",
       headers,
       body: JSON.stringify(formattedPayload),
@@ -89,8 +88,8 @@ export async function PUT(request: Request) {
       status: incomingData.status // Useful if you have an approval/hidden toggle system
     };
 
-    const response = await fetch(`${RAILWAY_API_URL}/comments/`, {
-      method: "PUT",
+    const response = await fetch(`${BACKEND_API_V1_URL}/comments/${incomingData.id}/`, {
+      method: "PATCH",
       headers,
       body: JSON.stringify(formattedPayload),
     });

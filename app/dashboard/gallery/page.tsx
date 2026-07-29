@@ -30,6 +30,7 @@ export default function GalleryPage() {
     fetch("/api/gallery") 
       .then((res) => res.json()) 
       .then((serverData) => { 
+        const serverItems = Array.isArray(serverData) ? serverData : serverData.results || [];
         // 🧠 HYDRATION SYNC LOADER: Check if browser cache memory has local uploads
         if (typeof window !== "undefined") {
           const cachedLocalData = localStorage.getItem("gallery_data") || localStorage.getItem("radio_gallery ");
@@ -37,7 +38,7 @@ export default function GalleryPage() {
             try {
               const parsedLocal = JSON.parse(cachedLocalData);
               // ⚡ THE PERMANENT LOCK: If local items exist, preserve them on your screen!
-              if (Array.isArray(parsedLocal) && parsedLocal.length >= serverData.length) {
+              if (Array.isArray(parsedLocal) && parsedLocal.length >= serverItems.length) {
                 setList(parsedLocal);
                 setLoading(false);
                 return;
@@ -49,7 +50,7 @@ export default function GalleryPage() {
         }
         
         // Baseline fallback path if no cache exists yet
-        setList(serverData);
+        setList(serverItems);
      
         setLoading(false); 
       }) 

@@ -36,7 +36,7 @@ export default function EpisodesPage() {
     fetch("/api/episodes")
       .then((res) => res.json())
       .then((data) => {
-        setList(data);
+        setList(Array.isArray(data) ? data : data.results || []);
         
         
         setLoading(false);

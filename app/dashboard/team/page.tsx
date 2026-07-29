@@ -30,7 +30,7 @@ export default function TeamPage() {
     fetch("/api/team")
       .then((res) => res.json())
       .then((data) => {
-        setList(data);
+        setList(Array.isArray(data) ? data : data.results || []);
      
         setLoading(false);
       })

@@ -1,14 +1,12 @@
 import { NextResponse } from 'next/server';
 import {
+  BACKEND_API_V1_URL,
   backendAuthFailure,
   getBackendAuthHeaders,
   unauthorizedResponse,
 } from "../../lib/backend-auth";
 
 // 🔄 FIXED: Points exactly to your master production variable saved in .env.local
-const RAILWAY_API_URL = process.env.RAILWAY_API_URL || "https://railway.app";
-
-
 // 1. GET ROUTE: Fetch active landing zones directly from Railway
 export async function GET() {
   const headers = await getBackendAuthHeaders();
@@ -16,7 +14,7 @@ export async function GET() {
 
   try {
     // 🔄 FIXED: Stripped out the extra '/api' and added trailing slash to hit /sections/ directly
-    const response = await fetch(`${RAILWAY_API_URL}/sections/`, { 
+    const response = await fetch(`${BACKEND_API_V1_URL}/page-sections/`, {
       headers,
       cache: "no-store" 
     });
@@ -56,8 +54,8 @@ export async function PUT(request: Request) {
     };
 
     // 🔄 FIXED: Stripped out the extra '/api' and added trailing slash to hit /sections/ directly
-    const response = await fetch(`${RAILWAY_API_URL}/sections/`, {
-      method: "PUT",
+    const response = await fetch(`${BACKEND_API_V1_URL}/page-sections/${body.id || body.section_key}/`, {
+      method: "PATCH",
       headers,
       body: JSON.stringify(payload),
     });

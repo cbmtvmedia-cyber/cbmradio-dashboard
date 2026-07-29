@@ -30,7 +30,7 @@ export default function ProgramsPage() {
     fetch("/api/programs") 
       .then((res) => res.json()) 
       .then((data) => { 
-        setList(data);
+        setList(Array.isArray(data) ? data : data.results || []);
      
         setLoading(false); 
       }) 

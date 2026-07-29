@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import {
+  BACKEND_API_V1_URL,
   backendAuthFailure,
   getBackendAuthHeaders,
   unauthorizedResponse,
@@ -12,7 +13,7 @@ export async function GET() {
 
   try {
     // 🔄 UPDATED PATH: Hits /episodes/ directly based on documentation page 7
-    const response = await fetch(`${process.env.RAILWAY_API_URL}/episodes/`, { 
+    const response = await fetch(`${BACKEND_API_V1_URL}/episodes/`, {
       headers,
       cache: "no-store" 
     });
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
     };
 
     // 🔄 UPDATED PATH: Sends payload securely down their production endpoint
-    const response = await fetch(`${process.env.RAILWAY_API_URL}/episodes/`, {
+    const response = await fetch(`${BACKEND_API_V1_URL}/episodes/`, {
       method: "POST",
       headers,
       body: JSON.stringify(formattedPayload),
@@ -65,5 +66,34 @@ export async function POST(request: Request) {
     return NextResponse.json(finalSavedData);
   } catch {
     return NextResponse.json({ error: "Authentication or saving endpoint offline" }, { status: 500 });
+  }
+}
+
+export async function PUT(request: Request) {
+  const headers = await getBackendAuthHeaders(true);
+  if (!headers) return unauthorizedResponse();
+
+  try {
+    const incomingData = await request.json();
+    const formattedPayload = {
+      program: incomingData.program || 1,
+      title: incomingData.title,
+      description: incomingData.description,
+      cover_image: incomingData.cover_image || "",
+      youtube_link: incomingData.youtube_link || "",
+      download_link: incomingData.download_link || "",
+      publish_date: incomingData.publish_date,
+    };
+    const response = await fetch(`${BACKEND_API_V1_URL}/episodes/${incomingData.id}/`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify(formattedPayload),
+    });
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
+    if (!response.ok) throw new Error("Failed to update episode");
+    return NextResponse.json(await response.json());
+  } catch {
+    return NextResponse.json({ error: "Episodes update endpoint offline" }, { status: 500 });
   }
 }
