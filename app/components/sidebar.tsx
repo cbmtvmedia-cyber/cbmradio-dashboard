@@ -16,7 +16,6 @@ import {
 } from "lucide-react";
 
 interface SidebarProps { 
-  
   themeMode: "dark" | "light" | "system";
   setThemeMode: (mode: "dark" | "light" | "system") => void;
   resolvedDark: boolean;
@@ -24,7 +23,6 @@ interface SidebarProps {
 }
 
 export default function Sidebar({
-  
   themeMode,
   setThemeMode,
   resolvedDark,
