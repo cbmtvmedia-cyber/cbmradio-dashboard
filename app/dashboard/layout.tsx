@@ -211,6 +211,7 @@ export default function DashboardLayout({
             themeMode={themeMode}
             setThemeMode={setThemeMode}
             resolvedDark={resolvedDark}
+            isCollapsed={false}
           />
         </div>
 
