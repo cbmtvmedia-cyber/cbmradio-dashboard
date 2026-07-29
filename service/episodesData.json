@@ -1,0 +1,22 @@
+[
+  {
+    "id": "ep-1",
+    "programTitle": "youth talk",
+    "title": "Freelancing Without Burnout",
+    "description": "Learn how to manage time, set boundaries with clients, and scale your digital career.",
+    "thumbnailImage": "https://unsplash.com",
+    "youtubeLink": "https://youtube.com",
+    "downloadLink": "https://example.com",
+    "publishDate": "2026-06-25"
+  },
+  {
+    "id": "ep-2",
+    "programTitle": "morning show",
+    "title": "Live Studio Session Mix",
+    "description": "An exclusive morning block featuring local indie track selections and live studio mixing.",
+    "thumbnailImage": "https://unsplash.com",
+    "youtubeLink": "https://youtube.com",
+    "downloadLink": "https://example.com",
+    "publishDate": "2026-06-28"
+  }
+]
