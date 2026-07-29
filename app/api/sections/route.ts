@@ -1,4 +1,9 @@
 import { NextResponse } from 'next/server';
+import {
+  backendAuthFailure,
+  getBackendAuthHeaders,
+  unauthorizedResponse,
+} from "../../lib/backend-auth";
 
 // 🔄 FIXED: Points exactly to your master production variable saved in .env.local
 const RAILWAY_API_URL = process.env.RAILWAY_API_URL || "https://railway.app";
@@ -6,12 +11,18 @@ const RAILWAY_API_URL = process.env.RAILWAY_API_URL || "https://railway.app";
 
 // 1. GET ROUTE: Fetch active landing zones directly from Railway
 export async function GET() {
+  const headers = await getBackendAuthHeaders();
+  if (!headers) return unauthorizedResponse();
+
   try {
     // 🔄 FIXED: Stripped out the extra '/api' and added trailing slash to hit /sections/ directly
     const response = await fetch(`${RAILWAY_API_URL}/sections/`, { 
+      headers,
       cache: "no-store" 
     });
     
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
     if (!response.ok) throw new Error("Railway fetch failed");
     const data = await response.json();
     return NextResponse.json(data);
@@ -26,6 +37,9 @@ export async function GET() {
 
 // 2. PUT ROUTE: Map frontend updates and save them directly back to the server database
 export async function PUT(request: Request) {
+  const headers = await getBackendAuthHeaders(true);
+  if (!headers) return unauthorizedResponse();
+
   try {
     const body = await request.json();
 
@@ -44,10 +58,12 @@ export async function PUT(request: Request) {
     // 🔄 FIXED: Stripped out the extra '/api' and added trailing slash to hit /sections/ directly
     const response = await fetch(`${RAILWAY_API_URL}/sections/`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(payload),
     });
 
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
     if (!response.ok) throw new Error("Failed to modify layout section configuration");
     const updatedRecord = await response.json();
     return NextResponse.json(updatedRecord);

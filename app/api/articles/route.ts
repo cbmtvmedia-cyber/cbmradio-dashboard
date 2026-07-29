@@ -1,15 +1,26 @@
 import { NextResponse } from 'next/server';
+import {
+  backendAuthFailure,
+  getBackendAuthHeaders,
+  unauthorizedResponse,
+} from "../../lib/backend-auth";
 
 // 🔄 UPDATED: Points exactly to your master production variable saved in .env.local
 const RAILWAY_API_URL = process.env.RAILWAY_API_URL || "https://railway.app";
 
 // 1. GET ROUTE: Fetch articles list directly from Railway
 export async function GET() {
+  const headers = await getBackendAuthHeaders();
+  if (!headers) return unauthorizedResponse();
+
   try {
     const response = await fetch(`${RAILWAY_API_URL}/articles/`, { 
+      headers,
       cache: "no-store" 
     });
     
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
     if (!response.ok) throw new Error("Railway fetch failed");
     const data = await response.json();
     return NextResponse.json(data);
@@ -31,6 +42,9 @@ export async function GET() {
 
 // 2. POST ROUTE: Receive new articles from your frontend page form
 export async function POST(request: Request) {
+  const headers = await getBackendAuthHeaders(true);
+  if (!headers) return unauthorizedResponse();
+
   try {
     const incomingData = await request.json();
 
@@ -44,10 +58,12 @@ export async function POST(request: Request) {
 
     const response = await fetch(`${RAILWAY_API_URL}/articles/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(formattedPayload),
     });
 
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
     if (!response.ok) throw new Error("Failed to create article on backend");
     const finalSavedData = await response.json();
     
@@ -59,6 +75,9 @@ export async function POST(request: Request) {
 
 // 3. PUT ROUTE: Receive edited updates from your frontend handleSave blocks
 export async function PUT(request: Request) {
+  const headers = await getBackendAuthHeaders(true);
+  if (!headers) return unauthorizedResponse();
+
   try {
     const incomingData = await request.json();
 
@@ -73,10 +92,12 @@ export async function PUT(request: Request) {
     // Note: If your backend edits by slug or ID, append it here like `${RAILWAY_API_URL}/articles/${incomingData.id}/`
     const response = await fetch(`${RAILWAY_API_URL}/articles/`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(formattedPayload),
     });
 
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
     if (!response.ok) throw new Error("Failed to update article on backend");
     const finalSavedData = await response.json();
     

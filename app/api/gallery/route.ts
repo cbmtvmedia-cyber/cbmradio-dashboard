@@ -1,10 +1,20 @@
 import { NextResponse } from 'next/server';
+import {
+  backendAuthFailure,
+  getBackendAuthHeaders,
+  unauthorizedResponse,
+} from "../../lib/backend-auth";
 
 const RAILWAY_API_URL = process.env.RAILWAY_API_URL || "https://railway.app";
 
 export async function GET() {
+  const headers = await getBackendAuthHeaders();
+  if (!headers) return unauthorizedResponse();
+
   try {
-    const response = await fetch(`${RAILWAY_API_URL}/sections/`, { cache: "no-store" });
+    const response = await fetch(`${RAILWAY_API_URL}/sections/`, { headers, cache: "no-store" });
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
     if (!response.ok) throw new Error("Railway fetch failed");
     const data = await response.json();
     return NextResponse.json(data);
@@ -14,6 +24,9 @@ export async function GET() {
 }
 
 export async function PUT(request: Request) {
+  const headers = await getBackendAuthHeaders(true);
+  if (!headers) return unauthorizedResponse();
+
   try {
     const body = await request.json();
     const payload = {
@@ -29,10 +42,12 @@ export async function PUT(request: Request) {
 
     const response = await fetch(`${RAILWAY_API_URL}/sections/`, {
       method: "PUT",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(payload),
     });
 
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
     if (!response.ok) throw new Error("Failed to update layout section");
     const data = await response.json();
     return NextResponse.json(data);

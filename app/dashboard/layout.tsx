@@ -27,7 +27,12 @@ export default function DashboardLayout({
   const [profileDropdownOpen, setProfileDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const profilePhotoInputRef = useRef<HTMLInputElement>(null);
-  const [currentUser, setCurrentUser] = useState<{ email: string; photo: string | null }>({
+  const [currentUser, setCurrentUser] = useState<{
+    username: string;
+    email: string;
+    photo: string | null;
+  }>({
+    username: "Admin",
     email: "",
     photo: null,
   });
@@ -78,6 +83,38 @@ export default function DashboardLayout({
   }, [resolvedDark]);
 
   useEffect(() => {
+    let active = true;
+
+    async function loadCurrentAdmin() {
+      try {
+        const response = await fetch("/api/auth/me", { cache: "no-store" });
+        const data = await response.json();
+
+        if (!response.ok || !data.user) {
+          window.location.replace("/login");
+          return;
+        }
+
+        if (active) {
+          setCurrentUser((user) => ({
+            ...user,
+            username: data.user.username,
+            email: data.user.email,
+          }));
+          localStorage.setItem("user", JSON.stringify(data.user));
+        }
+      } catch {
+        // Keep the dashboard visible during a temporary network interruption.
+      }
+    }
+
+    loadCurrentAdmin();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
     const id = "radio-dashboard-universal-theme-animations";
     let tag = document.getElementById(id) as HTMLStyleElement;
     if (!tag) {
@@ -105,7 +142,7 @@ export default function DashboardLayout({
   const profileCardBg = resolvedDark ? "rgba(255,255,255,0.04)" : "rgba(15, 23, 42, 0.03)";
   const sidebarBg = resolvedDark ? "#0b131a" : "#e2e8f0";
   const sidebarBorder = resolvedDark ? "1px solid rgba(255,255,255,0.06)" : "1px solid #cbd5e1";
-  const displayName = "Admin";
+  const displayName = currentUser.username || "Admin";
   const initials = displayName.slice(0, 2).toUpperCase();
 
   const updatePhoto = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -114,22 +151,20 @@ export default function DashboardLayout({
     setCurrentUser((user) => ({ ...user, photo: URL.createObjectURL(file) }));
   };
 
-  const signOut = () => {
-  setProfileDropdownOpen(false);
-  
-  // 💡 Enhanced Cookie Wipe: Adds an immediate expiration fallback
-  document.cookie = "admin_jwt_token=; path=/; max-age=0; SameSite=Strict; Secure";
-  document.cookie = "admin_jwt_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; SameSite=Strict; Secure";
-  
-  // ✅ Keep these cleanup items! They clear user memory tracks perfectly on exit.
-  localStorage.removeItem("currentUser");
-  localStorage.removeItem("loggedInUser");
-  localStorage.removeItem("user");
-  localStorage.removeItem("token");
-  sessionStorage.clear();
+  const signOut = async () => {
+    setProfileDropdownOpen(false);
 
-  window.location.replace("/login");
-};
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      localStorage.removeItem("currentUser");
+      localStorage.removeItem("loggedInUser");
+      localStorage.removeItem("user");
+      localStorage.removeItem("token");
+      sessionStorage.clear();
+      window.location.replace("/login");
+    }
+  };
 
 
   return (

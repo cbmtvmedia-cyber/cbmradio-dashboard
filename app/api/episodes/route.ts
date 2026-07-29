@@ -1,13 +1,24 @@
 import { NextResponse } from 'next/server';
+import {
+  backendAuthFailure,
+  getBackendAuthHeaders,
+  unauthorizedResponse,
+} from "../../lib/backend-auth";
 
 // 1. GET ROUTE: Fetch live paginated list from Railway
 export async function GET() {
+  const headers = await getBackendAuthHeaders();
+  if (!headers) return unauthorizedResponse();
+
   try {
     // 🔄 UPDATED PATH: Hits /episodes/ directly based on documentation page 7
     const response = await fetch(`${process.env.RAILWAY_API_URL}/episodes/`, { 
+      headers,
       cache: "no-store" 
     });
     
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
     if (!response.ok) throw new Error("Railway fetch failed");
     const data = await response.json();
     return NextResponse.json(data);
@@ -22,6 +33,9 @@ export async function GET() {
 
 // 2. POST ROUTE: Receive from frontend page form and save permanently to Railway
 export async function POST(request: Request) {
+  const headers = await getBackendAuthHeaders(true);
+  if (!headers) return unauthorizedResponse();
+
   try {
     const incomingData = await request.json();
 
@@ -39,10 +53,12 @@ export async function POST(request: Request) {
     // 🔄 UPDATED PATH: Sends payload securely down their production endpoint
     const response = await fetch(`${process.env.RAILWAY_API_URL}/episodes/`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers,
       body: JSON.stringify(formattedPayload),
     });
 
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
     if (!response.ok) throw new Error("Failed to create episode on backend");
     const finalSavedData = await response.json();
     

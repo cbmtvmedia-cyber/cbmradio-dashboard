@@ -1,4 +1,5 @@
 "use client";
+import { useEffect, useState } from "react";
 
 interface TopbarProps {
   isCollapsed: boolean;
@@ -6,6 +7,28 @@ interface TopbarProps {
 }
 
 export default function Topbar({ isCollapsed, setIsCollapsed }: TopbarProps) {
+  const [adminUsername, setAdminUsername] = useState("Admin User");
+
+  useEffect(() => {
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json();
+        if (response.ok && data.user?.username) {
+          setAdminUsername(data.user.username);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
+
+  const signOut = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      localStorage.clear();
+      window.location.href = "/login";
+    }
+  };
+
   return (
     <header className="h-16 w-full bg-slate-900 border-b border-slate-800 px-6 flex items-center justify-between shrink-0">
       
@@ -31,7 +54,7 @@ export default function Topbar({ isCollapsed, setIsCollapsed }: TopbarProps) {
   <div className="text-right">
     <div className="text-xs font-semibold text-white">
       {/* 🟢 SAFE CHECK: Prevents server-side compilation crashes */}
-      {typeof window !== "undefined" ? localStorage.getItem("admin_username") || "Admin User" : "Admin User"}
+      {adminUsername}
     </div>
     <div className="text-[10px] text-emerald-400 font-bold uppercase tracking-wider">
       Station Manager
@@ -42,12 +65,7 @@ export default function Topbar({ isCollapsed, setIsCollapsed }: TopbarProps) {
   
   {/* 🚪 WORKING LOGOUT ACTION BUTTON */}
   <button 
-    onClick={() => {
-      // 🧹 Clears your browser's security gate tokens immediately
-      document.cookie = "admin_jwt_token=; path=/; max-age=0; SameSite=Strict; Secure";
-      localStorage.clear();
-      window.location.href = "/login";
-    }}
+    onClick={signOut}
     className="px-2.5 py-1.5 rounded bg-slate-800 border border-slate-700 hover:border-rose-500 text-[10px] font-bold text-rose-400 hover:text-rose-300 transition cursor-pointer font-mono"
   >
     🚪 SIGN OUT

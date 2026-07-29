@@ -28,17 +28,15 @@ useEffect(() => {
 
       const data = await res.json();
 
-      if (res.ok && data.token) {
-        // 🔑 THE STORAGE: Saves the secret JWT passport into your browser locker
-           document.cookie = `admin_jwt_token=${data.token}; path=/; max-age=86400; SameSite=Strict; Secure`;
-        
-        
+      if (res.ok && data.user) {
+        localStorage.setItem("user", JSON.stringify(data.user));
+
         setToast("⚡ Authorization Verified! Unlocking Control Tower Room...");
         setTimeout(() => {
-          window.location.href = "/dashboard"; // Redirects directly into your dashboard grids
+          window.location.href = "/dashboard";
         }, 1500);
       } else {
-        setToast("❌ Access Denied: Invalid Administrator Credentials.");
+        setToast(data.error || "❌ Access Denied: Invalid Administrator Credentials.");
       }
     } catch {
       setToast("❌ Network Error: Failed to reach authorization server.");
@@ -86,5 +84,4 @@ useEffect(() => {
   </div>
 );
 }
-
 

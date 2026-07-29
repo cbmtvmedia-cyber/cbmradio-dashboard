@@ -1,12 +1,25 @@
 // 📁 FILE PATH: app/api/dashboard/route.ts
 import { NextResponse } from "next/server";
+import {
+  backendAuthFailure,
+  getBackendAuthHeaders,
+  unauthorizedResponse,
+} from "../lib/backend-auth";
 
 const RAILWAY_API_URL = process.env.NEXT_PUBLIC_API_URL || "https://railway.app";
 
 export async function GET() {
+  const headers = await getBackendAuthHeaders();
+  if (!headers) return unauthorizedResponse();
+
   try {
     // 📡 Fetch the master aggregated dashboard stats directly from Railway
-    const response = await fetch(`${RAILWAY_API_URL}/api/dashboard/stats`, { cache: "no-store" });
+    const response = await fetch(`${RAILWAY_API_URL}/api/dashboard/stats`, {
+      headers,
+      cache: "no-store",
+    });
+    const authFailure = await backendAuthFailure(response);
+    if (authFailure) return authFailure;
     if (!response.ok) throw new Error("Railway fetch failed");
     
     const liveData = await response.json();
