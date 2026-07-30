@@ -4,7 +4,7 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import Toast from "../../components/toast";
 
-type GalleryCategory = "Photos" | "Studio" | "Community";
+type GalleryCategory = "Photos" | "Studio" | "Community" | "Team";
 
 interface GalleryItem {
   id: string;
@@ -163,7 +163,7 @@ export default function GalleryPage() {
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {(["All", "Photos", "Studio", "Community"] as const).map((item) => (
+        {(["All", "Photos", "Studio", "Community", "Team"] as const).map((item) => (
           <button
             key={item}
             onClick={() => setSelectedCategory(item)}
@@ -211,6 +211,7 @@ export default function GalleryPage() {
                 <option value="Photos">Photos</option>
                 <option value="Studio">Studio</option>
                 <option value="Community">Community</option>
+                <option value="Team">Team</option>
               </select>
             </label>
             {previewUrl && (

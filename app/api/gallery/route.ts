@@ -12,12 +12,19 @@ const categoryMap: Record<string, string> = {
   Videos: "general",
   Studio: "studio",
   Community: "events",
+  Team: "team",
 };
 
 function toGallery(item: Record<string, unknown>) {
   const source = text(item.category);
   const category =
-    source === "studio" ? "Studio" : source === "events" ? "Community" : "Photos";
+    source === "studio"
+      ? "Studio"
+      : source === "events"
+        ? "Community"
+        : source === "team"
+          ? "Team"
+          : "Photos";
   return {
     ...item,
     id: String(item.id ?? ""),
