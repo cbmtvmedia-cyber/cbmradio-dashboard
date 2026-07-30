@@ -3,12 +3,14 @@
 import React, { useEffect, useState } from "react"; 
 import Image from "next/image"; 
 import Toast from "../../components/toast"; 
+import { extractApiError, SiteImageFields } from "../../components/site-image-fields";
 
 interface Program { 
   id: string; 
   title: string; 
   description: string; 
   coverImage: string; 
+  externalCoverImage?: string;
   presenter: string; 
 } 
 
@@ -25,6 +27,8 @@ export default function ProgramsPage() {
   const [description, setDescription] = useState(""); 
   const [coverImage, setCoverImage] = useState(""); 
   const [presenter, setPresenter] = useState(""); 
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [formError, setFormError] = useState("");
 
   useEffect(() => { 
     fetch("/api/programs") 
@@ -37,58 +41,39 @@ export default function ProgramsPage() {
       .catch(() => setLoading(false)); 
   }, []); 
 
-  const handleSave = async (e: React.FormEvent) => { 
-    e.preventDefault(); 
-    if (!title || !presenter) return; 
-    
-    if (editingProgram) { 
-      // Handle Edit Action Engine (PUT) 
-      const res = await fetch("/api/programs", { 
-        method: "PUT", 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ 
-          id: editingProgram.id, 
-          title, 
-          description, 
-          coverImage, 
-          presenter, 
-        }), 
-      }); 
-      if (res.ok) { 
-        const updated = await res.json(); 
-        const updatedList = list.map((p) => (p.id === updated.id ? updated : p));
-        setList(updatedList);
-       
-        setToast("🎙️ Radio program data fields successfully edited!"); 
-      } 
-    } else { 
-      // Handle Add Action Engine (POST) 
-      const res = await fetch("/api/programs", { 
-        method: "POST", 
-        headers: { "Content-Type": "application/json" }, 
-        body: JSON.stringify({ 
-          title, 
-          description: description || "Active CBM Radio channel.", 
-          coverImage: coverImage || "https://unsplash.com", 
-          presenter, 
-        }), 
-      }); 
-      if (res.ok) { 
-        const newProg = await res.json(); 
-        const updatedList = [newProg, ...list];
-        setList(updatedList);
-        
-        setToast("🎙️ New CBM Radio program brand channel added live!"); 
-      } 
-    } 
-    clearForm(); 
-  }; 
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!title || !presenter) return;
+    setFormError("");
+    const form = new FormData();
+    if (editingProgram) form.set("id", editingProgram.id);
+    form.set("title", title);
+    form.set("description", description);
+    form.set("presenter", presenter);
+    if (coverImage) form.set("cover_image", coverImage);
+    if (selectedFile) form.set("uploaded_cover_image", selectedFile);
+    const res = await fetch("/api/programs", {
+      method: editingProgram ? "PUT" : "POST",
+      body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setFormError(extractApiError(data));
+      return;
+    }
+    setList(editingProgram
+      ? list.map((program) => program.id === data.id ? data : program)
+      : [data, ...list]);
+    setToast(editingProgram ? "Program updated." : "Program created.");
+    clearForm();
+  };
 
   const startEdit = (p: Program) => { 
     setEditingProgram(p); 
     setTitle(p.title); 
     setDescription(p.description); 
-    setCoverImage(p.coverImage); 
+    setCoverImage(p.externalCoverImage || ""); 
+    setSelectedFile(null);
     setPresenter(p.presenter); 
     setShowForm(true); 
   }; 
@@ -111,6 +96,8 @@ export default function ProgramsPage() {
     setDescription(""); 
     setCoverImage(""); 
     setPresenter(""); 
+    setSelectedFile(null);
+    setFormError("");
     setEditingProgram(null); 
     setShowForm(false); 
     setTimeout(() => setToast(null), 2500); 
@@ -150,10 +137,13 @@ export default function ProgramsPage() {
             <div> 
               <label className="block text-slate-400 mb-1"> Presenter Name * </label> 
               <input type="text" required value={presenter} onChange={(e) => setPresenter(e.target.value)} placeholder="Sarah Jenkins" className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" /> </div> 
-            <div> 
-              <label className="block text-slate-400 mb-1"> Cover Image URL </label> 
-              <input type="text" value={coverImage} onChange={(e) => setCoverImage(e.target.value)} placeholder="https://unsplash.com..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none font-mono" /> 
-            </div> 
+            <SiteImageFields
+              currentUrl={editingProgram?.coverImage}
+              externalUrl={coverImage}
+              file={selectedFile}
+              onExternalUrlChange={setCoverImage}
+              onFileChange={setSelectedFile}
+            />
           </div> 
           <div className="space-y-3 flex flex-col justify-between"> 
             <div> 
@@ -163,6 +153,7 @@ export default function ProgramsPage() {
               <button type="button" onClick={clearForm} className="px-4 py-2 rounded bg-slate-800 text-slate-300 font-bold" > Cancel </button> 
               <button type="submit" className="px-6 py-2 bg-emerald-500 text-slate-950 font-bold rounded uppercase tracking-wider" > {editingProgram ? "Update Program" : "Commit Program"} </button> 
             </div> 
+            {formError && <p className="text-rose-400">{formError}</p>}
           </div> 
         </form> 
       )} 

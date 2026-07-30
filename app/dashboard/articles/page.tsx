@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Toast from "../../components/toast";
+import { extractApiError, SiteImageFields } from "../../components/site-image-fields";
 
 interface Article {
   id: string;
@@ -10,6 +11,7 @@ interface Article {
   summary: string;
   content: string;
   coverImage: string;
+  externalCoverImage?: string;
   status: "Draft" | "Published";
 }
 
@@ -26,6 +28,8 @@ export default function ArticlesPage() {
   const [content, setContent] = useState("");
   const [coverImage, setCoverImage] = useState("");
   const [status, setStatus] = useState<"Draft" | "Published">("Draft");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [formError, setFormError] = useState("");
 
     useEffect(() => {
     fetch("/api/articles")
@@ -44,48 +48,31 @@ export default function ArticlesPage() {
     e.preventDefault();
     if (!title) return;
 
-    if (editingArticle) {
-      const res = await fetch("/api/articles", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: editingArticle.slug, title, summary, body: content, cover_image: coverImage, status }),
-
-      });
-          if (res.ok) {
-      const updated = await res.json();
-      const updatedList = list.map((a) => (a.id === updated.id ? updated : a));
-      setList(updatedList);
-
-      
-      setToast("📰 Article contents successfully updated!");
-    }
-
-
-      
-      } else {
+    setFormError("");
+    const form = new FormData();
+    if (editingArticle) form.set("slug", editingArticle.slug);
+    form.set("title", title);
+    form.set("body", content);
+    form.set("author", "CBM Radio");
+    form.set("is_published", String(status === "Published"));
+    if (status === "Published") form.set("published_at", new Date().toISOString());
+    if (coverImage) form.set("cover_image", coverImage);
+    if (selectedFile) form.set("uploaded_cover_image", selectedFile);
     const res = await fetch("/api/articles", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        title, 
-        summary: summary || "CBM broadcast bulletin.", 
-        body: content, 
-        cover_image: coverImage || "https://unsplash.com" 
-      }),
+      method: editingArticle ? "PUT" : "POST",
+      body: form,
     });
-
-    if (res.ok) {
-      const newArticle = await res.json();
-      const updatedList = [newArticle, ...list];
-      setList(updatedList);
-      
-      // ✅ FIX: Local storage loop completely removed here as well!
-      setToast("📰 New news article published to directory live!");
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setFormError(extractApiError(data));
+      return;
     }
-  }
-  
-  clearForm();
-};
+    setList(editingArticle
+      ? list.map((article) => article.id === data.id ? data : article)
+      : [data, ...list]);
+    setToast(editingArticle ? "Article updated." : "Article created.");
+    clearForm();
+  };
 
 
   const startEdit = (a: Article) => {
@@ -93,7 +80,8 @@ export default function ArticlesPage() {
     setTitle(a.title);
     setSummary(a.summary);
     setContent(a.content);
-    setCoverImage(a.coverImage);
+    setCoverImage(a.externalCoverImage || "");
+    setSelectedFile(null);
     setStatus(a.status);
     setShowForm(true);
   };
@@ -118,6 +106,8 @@ export default function ArticlesPage() {
     setContent("");
     setCoverImage("");
     setStatus("Draft");
+    setSelectedFile(null);
+    setFormError("");
     setEditingArticle(null);
     setShowForm(false);
     setTimeout(() => setToast(null), 2500);
@@ -152,10 +142,13 @@ export default function ArticlesPage() {
               <label className="block text-slate-400 mb-1">Brief Summary Track *</label>
               <input type="text" required value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Short introductory teaser snippet..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" />
             </div>
-            <div>
-              <label className="block text-slate-400 mb-1">Cover Thumbnail Image URL</label>
-              <input type="text" value={coverImage} onChange={(e) => setCoverImage(e.target.value)} placeholder="https://unsplash.com..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none font-mono" />
-            </div>
+            <SiteImageFields
+              currentUrl={editingArticle?.coverImage}
+              externalUrl={coverImage}
+              file={selectedFile}
+              onExternalUrlChange={setCoverImage}
+              onFileChange={setSelectedFile}
+            />
           </div>
           <div className="space-y-3 flex flex-col justify-between">
             <div>
@@ -173,6 +166,7 @@ export default function ArticlesPage() {
               <button type="button" onClick={clearForm} className="px-4 py-2 rounded bg-slate-800 text-slate-300 font-bold">Cancel</button>
               <button type="submit" className="px-6 py-2 bg-emerald-500 text-slate-950 font-bold rounded uppercase tracking-wider">{editingArticle ? "Update Story" : "Publish Story"}</button>
             </div>
+            {formError && <p className="text-rose-400">{formError}</p>}
           </div>
         </form>
       )}

@@ -2,6 +2,7 @@
 "use client";
 import React, { useEffect, useState } from "react";
 import Toast from "../../components/toast";
+import { extractApiError, SiteImageFields } from "../../components/site-image-fields";
 
 interface Section {
   id: string;
@@ -13,6 +14,7 @@ interface Section {
   image: string;
   backgroundImage: string;
   video?: string;
+  externalImage?: string;
 }
 
 export default function PageSectionsPage() {
@@ -29,6 +31,8 @@ export default function PageSectionsPage() {
   const [editImage, setEditImage] = useState("");
   const [editBgImage, setEditBgImage] = useState("");
   const [editVideo, setEditVideo] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     fetch("/api/sections")
@@ -46,12 +50,14 @@ export default function PageSectionsPage() {
     setEditTitle(section.title);
     setEditSubtitle(section.subtitle);
     setEditDescription(section.description);
-    setEditImage(section.image);
+    setEditImage(section.externalImage || "");
     setEditBgImage(section.backgroundImage);
     setEditVideo(section.video || "");
+    setSelectedFile(null);
+    setFormError("");
   };
 
-  const handleUpdate = async (e: React.FormEvent) => {
+  const handleUpdateLegacy = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingSection) return;
 
@@ -81,6 +87,36 @@ export default function PageSectionsPage() {
 
   if (loading) return <div className="p-4 text-xs text-slate-500 animate-pulse">📡 Fetching Editable Sections...</div>;
 
+  void handleUpdateLegacy;
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSection) return;
+
+    setFormError("");
+    const body = new FormData();
+    body.append("section_key", editingSection.id);
+    body.append("title", editTitle);
+    body.append("subtitle", editSubtitle);
+    body.append("body", editDescription);
+    body.append("image", editImage);
+    body.append("cta_label", "");
+    body.append("cta_url", "");
+    body.append("is_active", "true");
+    if (selectedFile) body.append("uploaded_image", selectedFile);
+
+    const res = await fetch("/api/sections", { method: "PUT", body });
+    if (!res.ok) {
+      setFormError(await extractApiError(res));
+      return;
+    }
+    const updatedData = await res.json();
+    setList(list.map((section) => section.id === updatedData.id ? updatedData : section));
+    setEditingSection(null);
+    setToast("Page section content and media updated successfully!");
+    setTimeout(() => setToast(null), 2500);
+  };
+
   const filteredList = list.filter(s => s.sectionName.toLowerCase().includes(search) || s.pageName.toLowerCase().includes(search));
 
   return (
@@ -108,7 +144,13 @@ export default function PageSectionsPage() {
               <div><label className="block text-slate-400 mb-1">Description Content Summary Paragraph *</label><textarea rows={3} required value={editDescription} onChange={e => setEditDescription(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none resize-none" /></div>
             </div>
             <div className="space-y-3">
-              <div><label className="block text-slate-400 mb-1">Feature Block Image URL *</label><input type="text" required value={editImage} onChange={e => setEditImage(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none font-mono" /></div>
+              <SiteImageFields
+                currentUrl={editingSection.image}
+                externalUrl={editImage}
+                file={selectedFile}
+                onExternalUrlChange={setEditImage}
+                onFileChange={setSelectedFile}
+              />
               <div><label className="block text-slate-400 mb-1">Background Layout Image URL *</label><input type="text" required value={editBgImage} onChange={e => setEditBgImage(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none font-mono" /></div>
               <div><label className="block text-slate-400 mb-1">Attached Media Video Link (Where applicable)</label><input type="text" value={editVideo} onChange={e => setEditVideo(e.target.value)} placeholder="No video links attached" className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none font-mono" /></div>
             </div>
@@ -117,6 +159,7 @@ export default function PageSectionsPage() {
             <button type="button" onClick={() => setEditingSection(null)} className="px-4 py-2 rounded bg-slate-800 text-slate-300 font-bold">Cancel</button>
             <button type="submit" className="px-6 py-2 rounded bg-emerald-500 text-slate-950 font-bold uppercase tracking-wider">Save Changes</button>
           </div>
+          {formError && <p className="text-rose-400">{formError}</p>}
         </form>
       )}
 

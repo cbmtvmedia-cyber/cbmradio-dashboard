@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Toast from "../../components/toast";
+import { extractApiError, SiteImageFields } from "../../components/site-image-fields";
 
 interface TeamMember {
   id: string;
@@ -10,6 +11,7 @@ interface TeamMember {
   category: string;
   bio: string;
   image: string;
+  externalImage?: string;
 }
 
 export default function TeamPage() {
@@ -25,6 +27,8 @@ export default function TeamPage() {
   const [category, setCategory] = useState("Leadership");
   const [bio, setBio] = useState("");
   const [image, setImage] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     fetch("/api/team")
@@ -37,7 +41,7 @@ export default function TeamPage() {
       .catch(() => setLoading(false));
   }, []);
 
-  const handleSave = async (e: React.FormEvent) => {
+  const handleSaveLegacy = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !position) return;
 
@@ -87,13 +91,44 @@ export default function TeamPage() {
     clearForm();
   };
 
+  void handleSaveLegacy;
+
+  const handleSave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!name || !position) return;
+
+    setFormError("");
+    const body = new FormData();
+    if (editingMember) body.append("id", editingMember.id);
+    body.append("name", name);
+    body.append("role", position);
+    body.append("bio", bio || "Station Staff Member.");
+    body.append("photo", image);
+    if (selectedFile) body.append("uploaded_photo", selectedFile);
+
+    const res = await fetch("/api/team", {
+      method: editingMember ? "PUT" : "POST",
+      body,
+    });
+    if (!res.ok) {
+      setFormError(await extractApiError(res));
+      return;
+    }
+    const saved = await res.json();
+    setList(editingMember ? list.map((m) => (m.id === saved.id ? saved : m)) : [saved, ...list]);
+    setToast(editingMember ? "Team member details successfully updated!" : "New staff profile added to directory!");
+    clearForm();
+  };
+
   const startEdit = (m: TeamMember) => {
     setEditingMember(m);
     setName(m.name);
     setPosition(m.position);
     setCategory(m.category);
     setBio(m.bio);
-    setImage(m.image);
+    setImage(m.externalImage || "");
+    setSelectedFile(null);
+    setFormError("");
     setShowForm(true);
   };
 
@@ -116,6 +151,8 @@ export default function TeamPage() {
     setCategory("Leadership");
     setBio("");
     setImage("");
+    setSelectedFile(null);
+    setFormError("");
     setEditingMember(null);
     setShowForm(false);
     setTimeout(() => setToast(null), 2500);
@@ -162,8 +199,13 @@ export default function TeamPage() {
           </div>
           <div className="space-y-3 flex flex-col justify-between">
             <div>
-              <label className="block text-slate-400 mb-1">Profile Image URL</label>
-              <input type="text" value={image} onChange={(e) => setImage(e.target.value)} placeholder="https://unsplash.com..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none font-mono" />
+              <SiteImageFields
+                currentUrl={editingMember?.image}
+                externalUrl={image}
+                file={selectedFile}
+                onExternalUrlChange={setImage}
+                onFileChange={setSelectedFile}
+              />
             </div>
             <div>
               <label className="block text-slate-400 mb-1">Biography</label>
@@ -173,6 +215,7 @@ export default function TeamPage() {
               <button type="button" onClick={clearForm} className="px-4 py-2 rounded bg-slate-800 text-slate-300 font-bold">Cancel</button>
               <button type="submit" className="px-6 py-2 bg-emerald-500 text-slate-950 font-bold rounded uppercase tracking-wider">{editingMember ? "Update Profile" : "Commit Profile"}</button>
             </div>
+            {formError && <p className="text-rose-400">{formError}</p>}
           </div>
         </form>
       )}

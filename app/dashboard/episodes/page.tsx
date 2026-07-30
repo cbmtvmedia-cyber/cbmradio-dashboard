@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Toast from "../../components/toast";
+import { extractApiError, SiteImageFields } from "../../components/site-image-fields";
 
 interface Episode {
   id: string;
@@ -11,6 +12,7 @@ interface Episode {
   title: string;
   description: string;
   thumbnailImage: string;
+  externalThumbnailImage?: string;
   youtubeLink: string;
   downloadLink: string;
   publishDate: string;
@@ -38,6 +40,8 @@ export default function EpisodesPage() {
   const [youtubeLink, setYoutubeLink] = useState("");
   const [downloadLink, setDownloadLink] = useState("");
   const [publishDate, setPublishDate] = useState("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [formError, setFormError] = useState("");
 
   useEffect(() => {
     fetch("/api/episodes")
@@ -62,44 +66,29 @@ export default function EpisodesPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !youtubeLink) return;
-    const payload = {
-  // 💡 Your backend team requires these exact underscore field names:
-  program_id: Number(programId),
-  title,
-  description,
-  cover_image: thumbnailImage || "https://unsplash.com",
-  youtube_link: youtubeLink,
-  download_link: downloadLink,
-  publish_date: publishDate || "2026-07-03",
-};
-
-    if (editingEpisode) {
-      const res = await fetch("/api/episodes", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: editingEpisode.id, ...payload }),
-      });
-      if (res.ok) {
-        const updated = await res.json();
-        const updatedList = list.map((ep) => (ep.id === updated.id ? updated : ep));
-        setList(updatedList);
-        
-        setToast("🎞️ Episode log entry successfully edited and updated!");
-      }
-    } else {
-      const res = await fetch("/api/episodes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (res.ok) {
-        const newEp = await res.json();
-        const updatedList = [newEp, ...list];
-        setList(updatedList);
-        
-        setToast("🎞️ New broadcast episode attached to parent program channel!");
-      }
+    setFormError("");
+    const form = new FormData();
+    if (editingEpisode) form.set("id", editingEpisode.id);
+    form.set("program_id", programId);
+    form.set("title", title);
+    form.set("description", description);
+    form.set("youtube_link", youtubeLink);
+    if (publishDate) form.set("publish_date", publishDate);
+    if (thumbnailImage) form.set("cover_image", thumbnailImage);
+    if (selectedFile) form.set("uploaded_cover_image", selectedFile);
+    const res = await fetch("/api/episodes", {
+      method: editingEpisode ? "PUT" : "POST",
+      body: form,
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setFormError(extractApiError(data));
+      return;
     }
+    setList(editingEpisode
+      ? list.map((episode) => episode.id === data.id ? data : episode)
+      : [data, ...list]);
+    setToast(editingEpisode ? "Episode updated." : "Episode created.");
     clearForm();
   };
 
@@ -108,7 +97,8 @@ export default function EpisodesPage() {
     setProgramId(String(ep.programId));
     setTitle(ep.title);
     setDescription(ep.description);
-    setThumbnailImage(ep.thumbnailImage);
+    setThumbnailImage(ep.externalThumbnailImage || "");
+    setSelectedFile(null);
     setYoutubeLink(ep.youtubeLink);
     
     // ⚡ FIXED CONDITIONAL ASSIGNMENT SCRIPT TO COMPLY WITH ESLINT RUN RULES
@@ -140,6 +130,8 @@ export default function EpisodesPage() {
     setYoutubeLink("");
     setDownloadLink("");
     setPublishDate("");
+    setSelectedFile(null);
+    setFormError("");
     setProgramId(programs[0] ? String(programs[0].id) : "");
     setEditingEpisode(null);
     setShowForm(false);
@@ -184,10 +176,13 @@ export default function EpisodesPage() {
               <label className="block text-slate-400 mb-1"> Episode Title * </label>
               <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Enter episode name" className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" />
             </div>
-            <div>
-              <label className="block text-slate-400 mb-1"> Thumbnail Image URL </label>
-              <input type="text" value={thumbnailImage} onChange={(e) => setThumbnailImage(e.target.value)} placeholder="https://unsplash.com..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none font-mono" />
-            </div>
+            <SiteImageFields
+              currentUrl={editingEpisode?.thumbnailImage}
+              externalUrl={thumbnailImage}
+              file={selectedFile}
+              onExternalUrlChange={setThumbnailImage}
+              onFileChange={setSelectedFile}
+            />
             <div>
               <label className="block text-slate-400 mb-1"> Publish Date Calendar </label>
               <input type="date" value={publishDate} onChange={(e) => setPublishDate(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none font-mono" />
@@ -210,6 +205,7 @@ export default function EpisodesPage() {
               <button type="button" onClick={clearForm} className="px-4 py-2 rounded bg-slate-800 text-slate-300 font-bold" > Cancel </button>
               <button type="submit" className="px-6 py-2 bg-emerald-500 text-slate-950 font-bold rounded uppercase tracking-wider" > {editingEpisode ? "Update Log" : "Save Episode"} </button>
             </div>
+            {formError && <p className="text-rose-400">{formError}</p>}
           </div>
         </form>
       )}
