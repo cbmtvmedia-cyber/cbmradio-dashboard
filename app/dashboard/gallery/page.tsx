@@ -105,6 +105,7 @@ export default function GalleryPage() {
     form.set("title", caption.trim());
     form.set("caption", caption.trim());
     form.set("category", category);
+    form.set("is_active", "true");
     if (selectedFile) form.set("uploaded_image", selectedFile);
     if (externalUrl.trim()) form.set("image", externalUrl.trim());
 
