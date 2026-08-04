@@ -24,7 +24,6 @@ export default function ArticlesPage() {
   const [toast, setToast] = useState<string | null>(null);
 
   const [title, setTitle] = useState("");
-  const [summary, setSummary] = useState("");
   const [content, setContent] = useState("");
   const [coverImage, setCoverImage] = useState("");
   const [status, setStatus] = useState<"Draft" | "Published">("Draft");
@@ -78,7 +77,6 @@ export default function ArticlesPage() {
   const startEdit = (a: Article) => {
     setEditingArticle(a);
     setTitle(a.title);
-    setSummary(a.summary);
     setContent(a.content);
     setCoverImage(a.externalCoverImage || "");
     setSelectedFile(null);
@@ -102,7 +100,6 @@ export default function ArticlesPage() {
 
   const clearForm = () => {
     setTitle("");
-    setSummary("");
     setContent("");
     setCoverImage("");
     setStatus("Draft");
@@ -137,10 +134,6 @@ export default function ArticlesPage() {
             <div>
               <label className="block text-slate-400 mb-1">Article Headline Title *</label>
               <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Headline brief summary..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" />
-            </div>
-            <div>
-              <label className="block text-slate-400 mb-1">Brief Summary Track *</label>
-              <input type="text" required value={summary} onChange={(e) => setSummary(e.target.value)} placeholder="Short introductory teaser snippet..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" />
             </div>
             <SiteImageFields
               currentUrl={editingArticle?.coverImage}

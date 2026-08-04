@@ -3,12 +3,13 @@ import { NextResponse } from "next/server";
 
 export const AUTH_COOKIE_NAME = "admin_jwt_token";
 
-export const AUTH_API_BASE_URL = (
-  process.env.RAILWAY_API_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  process.env.AUTH_API_URL ||
-  "https://railway.app"
-).replace(/\/$/, "");
+const configuredAuthApiBaseUrl = process.env.BACKEND_API_URL;
+
+if (!configuredAuthApiBaseUrl) {
+  throw new Error("Backend API URL is not configured.");
+}
+
+export const AUTH_API_BASE_URL = configuredAuthApiBaseUrl.replace(/\/$/, "");
 
 export const BACKEND_API_V1_URL = `${AUTH_API_BASE_URL}/api/v1`;
 
