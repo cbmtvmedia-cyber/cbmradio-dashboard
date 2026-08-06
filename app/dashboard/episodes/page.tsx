@@ -4,6 +4,8 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Toast from "../../components/toast";
 import { extractApiError, SiteImageFields } from "../../components/site-image-fields";
+import { normalizeYouTubeEmbedUrl, YOUTUBE_EMBED_ERROR, YOUTUBE_EMBED_HELP } from "../../lib/youtube-embed";
+import { StatusBadge } from "../../components/ui/surfaces";
 
 interface Episode {
   id: string;
@@ -14,13 +16,50 @@ interface Episode {
   thumbnailImage: string;
   externalThumbnailImage?: string;
   youtubeLink: string;
+  youtubeEmbedUrl: string;
   downloadLink: string;
   publishDate: string;
+  is_active: boolean;
 }
 
 interface ProgramOption {
   id: string;
   title: string;
+  is_active: boolean;
+}
+
+async function loadProgramOptions() {
+  const items: ProgramOption[] = [];
+  const ids = new Set<string>();
+  const visited = new Set<string>();
+  let next: string | null = "/api/programs?page=1&ordering=title";
+  let partial = false;
+  for (let page = 0; next && page < 25; page += 1) {
+    if (visited.has(next)) { partial = true; break; }
+    visited.add(next);
+    try {
+      const response: Response = await fetch(next);
+      if (!response.ok) { partial = true; break; }
+      const data: { results?: ProgramOption[]; next?: string | null } | ProgramOption[] = await response.json();
+      const results: ProgramOption[] = Array.isArray(data) ? data : data.results || [];
+      for (const program of results) if (!ids.has(String(program.id))) { ids.add(String(program.id)); items.push(program); }
+      if (Array.isArray(data) || !data.next) next = null;
+      else { const url: URL = new URL(data.next); next = `/api/programs${url.search}`; }
+    } catch { partial = true; break; }
+  }
+  if (next) partial = true;
+  return { items, partial };
+}
+
+function episodeVisibilityLabel(episode: Episode, programs: ProgramOption[]) {
+  if (!episode.is_active) return "Inactive Episode";
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Africa/Kampala", year: "numeric", month: "2-digit", day: "2-digit",
+  }).format(new Date());
+  if (episode.publishDate && episode.publishDate > today) return "Scheduled Episode";
+  const parent = programs.find((program) => String(program.id) === String(episode.programId));
+  if (episode.publishDate && parent?.is_active) return "Public Episode";
+  return "Active Episode";
 }
 
 export default function EpisodesPage() {
@@ -42,6 +81,10 @@ export default function EpisodesPage() {
   const [publishDate, setPublishDate] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formError, setFormError] = useState("");
+  const [youtubeError, setYoutubeError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [isActive, setIsActive] = useState(true);
+  const [programsPartial, setProgramsPartial] = useState(false);
 
   useEffect(() => {
     fetch("/api/episodes")
@@ -53,26 +96,37 @@ export default function EpisodesPage() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
-    fetch("/api/programs")
-      .then((res) => res.json())
-      .then((data) => {
-        const items = Array.isArray(data) ? data : data.results || [];
-        setPrograms(items);
-        if (items[0]) setProgramId(String(items[0].id));
-      })
-      .catch(() => setPrograms([]));
+    void loadProgramOptions().then(({ items, partial }) => {
+      setPrograms(items);
+      setProgramsPartial(partial);
+      if (items[0]) setProgramId(String(items[0].id));
+    });
   }, []);
+
+  const selectedProgram = programs.find((program) => String(program.id) === programId);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title || !youtubeLink) return;
+    if (!title || !youtubeLink || submitting) return;
+    const normalizedEmbed = normalizeYouTubeEmbedUrl(youtubeLink);
+    if (!normalizedEmbed) {
+      setYoutubeError(YOUTUBE_EMBED_ERROR);
+      return;
+    }
+    if (isActive && selectedProgram && !selectedProgram.is_active) {
+      setFormError("Activate the parent Program before activating this Episode.");
+      return;
+    }
+    setSubmitting(true);
     setFormError("");
+    setYoutubeError("");
     const form = new FormData();
     if (editingEpisode) form.set("id", editingEpisode.id);
     form.set("program_id", programId);
     form.set("title", title);
     form.set("description", description);
-    form.set("youtube_link", youtubeLink);
+    form.set("youtube_embed_url", normalizedEmbed);
+    form.set("is_active", String(isActive));
     if (publishDate) form.set("publish_date", publishDate);
     if (thumbnailImage) form.set("cover_image", thumbnailImage);
     if (selectedFile) form.set("uploaded_cover_image", selectedFile);
@@ -82,13 +136,17 @@ export default function EpisodesPage() {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
+      const fieldError = data && typeof data === "object" && Array.isArray(data.youtube_link) && typeof data.youtube_link[0] === "string" ? data.youtube_link[0] : "";
+      if (fieldError) setYoutubeError(fieldError);
       setFormError(extractApiError(data));
+      setSubmitting(false);
       return;
     }
     setList(editingEpisode
       ? list.map((episode) => episode.id === data.id ? data : episode)
       : [data, ...list]);
     setToast(editingEpisode ? "Episode updated." : "Episode created.");
+    setSubmitting(false);
     clearForm();
   };
 
@@ -99,7 +157,9 @@ export default function EpisodesPage() {
     setDescription(ep.description);
     setThumbnailImage(ep.externalThumbnailImage || "");
     setSelectedFile(null);
-    setYoutubeLink(ep.youtubeLink);
+    setYoutubeLink(ep.youtubeEmbedUrl || ep.youtubeLink);
+    setYoutubeError("");
+    setIsActive(ep.is_active);
     
     // ⚡ FIXED CONDITIONAL ASSIGNMENT SCRIPT TO COMPLY WITH ESLINT RUN RULES
     if (downloadLink !== ep.downloadLink) {
@@ -132,6 +192,8 @@ export default function EpisodesPage() {
     setPublishDate("");
     setSelectedFile(null);
     setFormError("");
+    setYoutubeError("");
+    setIsActive(true);
     setProgramId(programs[0] ? String(programs[0].id) : "");
     setEditingEpisode(null);
     setShowForm(false);
@@ -168,9 +230,11 @@ export default function EpisodesPage() {
               <select required value={programId} onChange={(e) => setProgramId(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" >
                 <option value="">Select a program</option>
                 {programs.map((program) => (
-                  <option key={program.id} value={program.id}>{program.title}</option>
+                  <option key={program.id} value={program.id}>{program.title} — {program.is_active ? "Active" : "Inactive"}</option>
                 ))}
               </select>
+              {programsPartial && <p className="mt-1 text-amber-300" role="status">Some Programs could not be loaded. Available options are shown.</p>}
+              {selectedProgram && !selectedProgram.is_active && <p className="mt-1 text-amber-300" role="alert">This Program is inactive. The Episode will not be available through the public Program experience until the Program is activated.</p>}
             </div>
             <div>
               <label className="block text-slate-400 mb-1"> Episode Title * </label>
@@ -190,9 +254,12 @@ export default function EpisodesPage() {
           </div>
           <div className="space-y-3 flex flex-col justify-between">
             <div>
-              <label className="block text-slate-400 mb-1"> YouTube Video URL Link * </label>
-              <input type="url" required value={youtubeLink} onChange={(e) => setYoutubeLink(e.target.value)} placeholder="https://youtube.com..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none font-mono" />
+              <label htmlFor="episode-youtube-embed" className="block text-slate-400 mb-1"> YouTube Embed URL * </label>
+              <input id="episode-youtube-embed" type="url" required value={youtubeLink} onChange={(e) => { setYoutubeLink(e.target.value); setYoutubeError(""); }} aria-invalid={Boolean(youtubeError) || undefined} aria-describedby="episode-youtube-help episode-youtube-error" placeholder="https://www.youtube.com/embed/VIDEO_ID" className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none font-mono" />
+              <p id="episode-youtube-help" className="mt-1 text-[10px] text-slate-500">{YOUTUBE_EMBED_HELP}</p>
+              {youtubeError && <p id="episode-youtube-error" className="mt-1 text-rose-400" role="alert">{youtubeError}</p>}
             </div>
+            {normalizeYouTubeEmbedUrl(youtubeLink) && <div className="video-embed-preview"><iframe src={normalizeYouTubeEmbedUrl(youtubeLink) || undefined} title={`${title || "Episode"} video preview`} allow="accelerometer; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen /></div>}
             <div>
               <label className="block text-slate-400 mb-1"> Audio Audio Download Link (MP3/WAV) </label>
               <input type="url" value={downloadLink} onChange={(e) => setDownloadLink(e.target.value)} placeholder="https://example.com" className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none font-mono" />
@@ -202,8 +269,8 @@ export default function EpisodesPage() {
               <textarea rows={2} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief summary story details..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none resize-none" />
             </div>
             <div className="flex justify-end space-x-2">
-              <button type="button" onClick={clearForm} className="px-4 py-2 rounded bg-slate-800 text-slate-300 font-bold" > Cancel </button>
-              <button type="submit" className="px-6 py-2 bg-emerald-500 text-slate-950 font-bold rounded uppercase tracking-wider" > {editingEpisode ? "Update Log" : "Save Episode"} </button>
+              <button type="button" onClick={clearForm} disabled={submitting} className="px-4 py-2 rounded bg-slate-800 text-slate-300 font-bold disabled:opacity-50" > Cancel </button>
+              <button type="submit" disabled={submitting} className="px-6 py-2 bg-emerald-500 text-slate-950 font-bold rounded uppercase tracking-wider disabled:opacity-50" > {submitting ? "Saving…" : editingEpisode ? "Update Log" : "Save Episode"} </button>
             </div>
             {formError && <p className="text-rose-400">{formError}</p>}
           </div>
@@ -222,10 +289,19 @@ export default function EpisodesPage() {
                 </div>
               )}
             </div>
+            <div>
+              <label htmlFor="episode-visibility" className="block text-slate-400 mb-1">Public visibility</label>
+              <select id="episode-visibility" value={isActive ? "active" : "inactive"} onChange={(e) => setIsActive(e.target.value === "active")} disabled={submitting} aria-describedby="episode-visibility-help" className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                <option value="active">Active — eligible for public publication</option>
+                <option value="inactive">Inactive — hidden from the public website</option>
+              </select>
+              <p id="episode-visibility-help" className="mt-1 text-[10px] text-slate-500">Active Episodes publish only when their date is today or earlier and their Program is active.</p>
+            </div>
             <div className="flex-1 min-w-0 flex flex-col justify-between space-y-3 w-full">
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h3 className="text-sm font-bold text-white truncate"> {ep.title} </h3>
+                  <StatusBadge status={ep.is_active ? "active" : "inactive"} label={episodeVisibilityLabel(ep, programs)} />
                   <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-slate-950 text-slate-300 border border-slate-800"> 📻 {ep.programTitle} </span>
                 </div>
                 <p className="text-[11px] text-slate-400 line-clamp-2 leading-relaxed pt-1"> {ep.description || "No description provided for this episode."} </p>

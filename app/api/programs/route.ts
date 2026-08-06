@@ -15,6 +15,7 @@ function toProgram(item: Record<string, unknown>) {
     id: String(item.id ?? ""),
     coverImage: text(item.cover_image),
     externalCoverImage: text(item.external_cover_image_url),
+    promoVideoUrl: text(item.promo_video_url),
   };
 }
 
@@ -24,6 +25,7 @@ function jsonPayload(body: Record<string, unknown>) {
     description: text(body.description),
     presenter: text(body.presenter),
     cover_image: text(body.cover_image, text(body.coverImage)),
+    promo_video_url: text(body.promo_video_url, text(body.promoVideoUrl)),
     is_featured: bool(body.is_featured),
     is_active: body.is_active !== false,
   };
@@ -40,6 +42,7 @@ async function mutate(request: Request, method: "POST" | "PATCH") {
       const form = await request.formData();
       id = text(form.get("id"));
       form.delete("id");
+      if (method === "POST" && !form.has("is_active")) form.set("is_active", "true");
       body = form;
     } else {
       const incoming = asRecord(await request.json());
@@ -63,7 +66,7 @@ export async function GET(request: Request) {
   try {
     const incoming = new URL(request.url).searchParams;
     const approved = new URLSearchParams();
-    for (const key of ["page", "ordering", "search"] as const) {
+    for (const key of ["page", "ordering", "search", "is_active"] as const) {
       const value = incoming.get(key)?.trim();
       if (value) approved.set(key, value);
     }

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Toast from "../../components/toast";
 import { extractApiError, SiteImageFields } from "../../components/site-image-fields";
+import { StatusBadge } from "../../components/ui/surfaces";
 
 interface TeamMember {
   id: string;
@@ -12,6 +13,7 @@ interface TeamMember {
   bio: string;
   image: string;
   externalImage?: string;
+  is_active: boolean;
 }
 
 export default function TeamPage() {
@@ -29,6 +31,8 @@ export default function TeamPage() {
   const [image, setImage] = useState("");
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [formError, setFormError] = useState("");
+  const [isActive, setIsActive] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     fetch("/api/team")
@@ -44,7 +48,6 @@ export default function TeamPage() {
   const handleSaveLegacy = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !position) return;
-
     if (editingMember) {
       const res = await fetch("/api/team", {
         method: "PUT",
@@ -95,8 +98,9 @@ export default function TeamPage() {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name || !position) return;
+    if (!name || !position || submitting) return;
 
+    setSubmitting(true);
     setFormError("");
     const body = new FormData();
     if (editingMember) body.append("id", editingMember.id);
@@ -104,6 +108,7 @@ export default function TeamPage() {
     body.append("role", position);
     body.append("bio", bio || "Station Staff Member.");
     body.append("photo", image);
+    body.append("is_active", String(isActive));
     if (selectedFile) body.append("uploaded_photo", selectedFile);
 
     const res = await fetch("/api/team", {
@@ -112,11 +117,13 @@ export default function TeamPage() {
     });
     if (!res.ok) {
       setFormError(await extractApiError(res));
+      setSubmitting(false);
       return;
     }
     const saved = await res.json();
     setList(editingMember ? list.map((m) => (m.id === saved.id ? saved : m)) : [saved, ...list]);
     setToast(editingMember ? "Team member details successfully updated!" : "New staff profile added to directory!");
+    setSubmitting(false);
     clearForm();
   };
 
@@ -127,6 +134,7 @@ export default function TeamPage() {
     setCategory(m.category);
     setBio(m.bio);
     setImage(m.externalImage || "");
+    setIsActive(m.is_active);
     setSelectedFile(null);
     setFormError("");
     setShowForm(true);
@@ -151,6 +159,7 @@ export default function TeamPage() {
     setCategory("Leadership");
     setBio("");
     setImage("");
+    setIsActive(true);
     setSelectedFile(null);
     setFormError("");
     setEditingMember(null);
@@ -211,9 +220,17 @@ export default function TeamPage() {
               <label className="block text-slate-400 mb-1">Biography</label>
               <textarea rows={2} value={bio} onChange={(e) => setBio(e.target.value)} placeholder="Brief introduction notes..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none resize-none" />
             </div>
+            <div>
+              <label htmlFor="team-visibility" className="block text-slate-400 mb-1">Public visibility</label>
+              <select id="team-visibility" value={isActive ? "active" : "inactive"} onChange={(e) => setIsActive(e.target.value === "active")} disabled={submitting} aria-describedby="team-visibility-help" className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white">
+                <option value="active">Active — show this team member publicly</option>
+                <option value="inactive">Inactive — keep this team member hidden</option>
+              </select>
+              <p id="team-visibility-help" className="mt-1 text-[10px] text-slate-500">Controls visibility on the Team page and homepage.</p>
+            </div>
             <div className="flex justify-end space-x-2">
               <button type="button" onClick={clearForm} className="px-4 py-2 rounded bg-slate-800 text-slate-300 font-bold">Cancel</button>
-              <button type="submit" className="px-6 py-2 bg-emerald-500 text-slate-950 font-bold rounded uppercase tracking-wider">{editingMember ? "Update Profile" : "Commit Profile"}</button>
+              <button type="submit" disabled={submitting} aria-busy={submitting} className="px-6 py-2 bg-emerald-500 text-slate-950 font-bold rounded uppercase tracking-wider disabled:opacity-50">{submitting ? "Saving…" : editingMember ? "Update Profile" : "Commit Profile"}</button>
             </div>
             {formError && <p className="text-rose-400">{formError}</p>}
           </div>
@@ -233,6 +250,7 @@ export default function TeamPage() {
                 <div>
                   <div className="flex items-start justify-between gap-2">
                     <h3 className="text-sm font-bold text-white uppercase tracking-wide truncate">{m.name}</h3>
+                    <StatusBadge status={m.is_active ? "active" : "inactive"} label={m.is_active ? "Active" : "Inactive"} />
                     <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded font-sans shrink-0">{m.category}</span>
                   </div>
                   <p className="text-[11px] text-slate-400 font-semibold mt-0.5">{m.position}</p>

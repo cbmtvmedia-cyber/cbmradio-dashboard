@@ -36,6 +36,7 @@ async function mutate(request: Request, method: "POST" | "PATCH") {
       const form = await request.formData();
       id = text(form.get("id")); form.delete("id");
       form.set("role", role(form.get("role") ?? form.get("position")));
+      if (method === "POST" && !form.has("is_active")) form.set("is_active", "true");
       form.delete("position"); body = form;
     } else {
       const incoming = asRecord(await request.json());
