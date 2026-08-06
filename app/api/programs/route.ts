@@ -57,12 +57,19 @@ async function mutate(request: Request, method: "POST" | "PATCH") {
   }
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const headers = await getBackendAuthHeaders();
   if (!headers) return unauthorizedResponse();
   try {
+    const incoming = new URL(request.url).searchParams;
+    const approved = new URLSearchParams();
+    for (const key of ["page", "ordering", "search"] as const) {
+      const value = incoming.get(key)?.trim();
+      if (value) approved.set(key, value);
+    }
+    const query = approved.size ? `?${approved.toString()}` : "";
     return preserveBackendResponse(
-      await fetch(`${BACKEND_API_V1_URL}/programs/`, { headers, cache: "no-store" }),
+      await fetch(`${BACKEND_API_V1_URL}/programs/${query}`, { headers, cache: "no-store" }),
       toProgram,
     );
   } catch {

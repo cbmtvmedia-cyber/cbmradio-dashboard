@@ -214,7 +214,13 @@ export default function EpisodesPage() {
         {filteredList.map((ep) => (
           <div key={ep.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex flex-col md:flex-row gap-5 shadow-sm group hover:border-slate-700 transition" >
             <div className="w-full md:w-40 h-24 bg-slate-950 border border-slate-800 rounded-lg overflow-hidden shrink-0 self-center md:self-start relative">
-              <Image src={ep.thumbnailImage} alt={ep.title} fill className="w-full h-full object-cover transition duration-300 group-hover:scale-105" />
+              {ep.thumbnailImage.trim() ? (
+                <Image src={ep.thumbnailImage} alt={ep.title} fill unoptimized className="w-full h-full object-cover transition duration-300 group-hover:scale-105" />
+              ) : (
+                <div className="flex h-full items-center justify-center px-3 text-center text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                  No thumbnail
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0 flex flex-col justify-between space-y-3 w-full">
               <div className="space-y-1">

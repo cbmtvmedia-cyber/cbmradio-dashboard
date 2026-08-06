@@ -1,16 +1,17 @@
 "use client";
 
-interface ToastProps {
-  message: string | null;
-}
+import { AlertCircle, CheckCircle2, Info, TriangleAlert, X } from "lucide-react";
+import { useEffect, useState } from "react";
 
-export default function Toast({ message }: ToastProps) {
+export type ToastVariant = "success" | "error" | "warning" | "info";
+export default function Toast({ message, variant="success", onDismiss, duration=6000 }: { message:string|null; variant?:ToastVariant; onDismiss?:()=>void; duration?:number }) {
   if (!message) return null;
-  
-  return (
-    <div className="fixed top-4 right-8 bg-slate-900 border-2 border-emerald-500 text-white font-medium text-xs px-4 py-3 rounded-xl shadow-xl z-50 flex items-center space-x-2">
-      <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-      <span>{message}</span>
-    </div>
-  );
+  return <ToastItem key={`${variant}:${message}`} message={message} variant={variant} onDismiss={onDismiss} duration={duration} />;
+}
+function ToastItem({ message, variant, onDismiss, duration }: { message:string; variant:ToastVariant; onDismiss?:()=>void; duration:number }) {
+  const [visible,setVisible]=useState(true); const [paused,setPaused]=useState(false);
+  useEffect(()=>{ if(paused)return; const timer=window.setTimeout(()=>{setVisible(false);onDismiss?.();},duration); return()=>window.clearTimeout(timer);},[duration,onDismiss,paused]);
+  if(!visible)return null;
+  const Icon={success:CheckCircle2,error:AlertCircle,warning:TriangleAlert,info:Info}[variant];
+  return <div className={`ui-toast ui-toast-${variant}`} role={variant==="error"?"alert":"status"} aria-live={variant==="error"?"assertive":"polite"} aria-atomic="true" onMouseEnter={()=>setPaused(true)} onMouseLeave={()=>setPaused(false)}><Icon aria-hidden="true"/><p>{message}</p><button type="button" onClick={()=>{setVisible(false);onDismiss?.();}} aria-label="Dismiss notification"><X aria-hidden="true"/></button></div>;
 }

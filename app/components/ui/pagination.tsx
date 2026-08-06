@@ -1,0 +1,3 @@
+import { Button } from "./button";
+
+export function Pagination({ count, currentPage, hasNext, hasPrevious, loading=false, onNext, onPrevious }: { count:number; currentPage:number; hasNext:boolean; hasPrevious:boolean; loading?:boolean; onNext:()=>void; onPrevious:()=>void }) { return <nav className="ui-pagination" aria-label="Pagination"><p>{count.toLocaleString()} {count===1?"item":"items"} · Page {currentPage}</p><div><Button variant="outline" onClick={onPrevious} disabled={!hasPrevious||loading}>Previous</Button><span aria-live="polite">Page {currentPage}</span><Button variant="outline" onClick={onNext} disabled={!hasNext||loading}>Next</Button></div></nav>; }

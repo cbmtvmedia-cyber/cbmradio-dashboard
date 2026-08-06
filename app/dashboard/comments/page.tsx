@@ -1,260 +1,172 @@
 "use client";
-import React, { useEffect, useState } from "react";
-import Toast from "../../components/toast";
 
-interface Comment {
-  id: string;
-  sender: string;
-  text: string;
-  targetType: "Article" | "Episode";
-  targetTitle: string;
-  replyText?: string;
-  status?: "Approved" | "Pending";
-  timestamp: string;
+import { MessageSquare } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import Toast, { type ToastVariant } from "../../components/toast";
+import { Button } from "../../components/ui/button";
+import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
+import { Input, Textarea } from "../../components/ui/form-controls";
+import { Pagination } from "../../components/ui/pagination";
+import { Card, EmptyState, ErrorState, LoadingState, PageHeader, StatusBadge } from "../../components/ui/surfaces";
+import { apiClient, isApiError } from "../../lib/api-client";
+import type { PaginatedResponse } from "../../types/api";
+import type { Comment, ReplyToCommentPayload, SetCommentApprovalPayload } from "../../types/comments";
+
+type ToastState = { message: string; variant: ToastVariant } | null;
+const emptyPage: PaginatedResponse<Comment> = { count: 0, next: null, previous: null, results: [] };
+
+function formatCommentDate(value: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" }).format(date);
+}
+
+function commentAssociation(comment: Comment) {
+  if (comment.article !== null) return `Article #${comment.article}`;
+  if (comment.episode !== null) return `Episode #${comment.episode}`;
+  return "Unknown content";
 }
 
 export default function CommentsPage() {
-  const [list, setList] = useState<Comment[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState(emptyPage);
+  const [requestPage, setRequestPage] = useState(1);
+  const [displayedPage, setDisplayedPage] = useState(1);
   const [search, setSearch] = useState("");
-  const [showSimForm, setShowSimForm] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [pageLoading, setPageLoading] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+  const [loadError, setLoadError] = useState("");
+  const [approvalId, setApprovalId] = useState<number | null>(null);
+  const [replyId, setReplyId] = useState<number | null>(null);
+  const [replyText, setReplyText] = useState("");
+  const [replyError, setReplyError] = useState("");
+  const [replying, setReplying] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Comment | null>(null);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [toast, setToast] = useState<ToastState>(null);
 
-  // 📝 STATES FOR VISITOR SIMULATION FIELDS
-  const [sender, setSender] = useState("");
-  const [text, setText] = useState("");
-  const [targetType, setTargetType] = useState<"Article" | "Episode">("Episode");
-  const [targetTitle, setTargetTitle] = useState("Live Studio Session Mix");
-
-  // ADMIN OPERATIONS STATES
-  const [activeReplyId, setActiveReplyId] = useState<string | null>(null);
-  const [typedReply, setTypedReply] = useState("");
-
-  useEffect(() => {
-    fetch("/api/comments")
-      .then((res) => res.json())
-      .then((data) => {
-        // 💡 UPDATED: Safely target the paginated results array from the backend server
-        const commentsData = data.results || [];
-        setList(commentsData);
-        
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
+  const loadComments = useCallback(async (page: number, query: string, signal?: AbortSignal) => {
+    const params = new URLSearchParams({ page: String(page) });
+    if (query.trim()) params.set("search", query.trim());
+    return apiClient.get<PaginatedResponse<Comment>>(`/api/comments?${params}`, { signal });
   }, []);
 
-
-  // 📡 CRITICAL SPEC RULE: Comments are displayed immediately after submission
-  const handleVisitorSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!sender.trim() || !text.trim()) return;
-
-    // Simulate immediate submission data payload package
-    const newComment: Comment = {
-      id: `com-${Date.now()}`,
-      sender,
-      text,
-      targetType,
-      targetTitle,
-      timestamp: "Just Now",
-    };
-
-    // Array unshift forces the new comment to render at the top instantly
-    const updatedList = [newComment, ...list];
-    setList(updatedList);
-
-
-    // Clear inputs and hide the testing box
-    setSender("");
-    setText("");
-    setShowSimForm(false);
-
-    // Fire up the verification notification toast
-    setToast("✨ Success! Comment submitted and displayed immediately.");
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const handleSubmitReply = async (id: string, e: React.FormEvent) => {
-    e.preventDefault();
-    if (!typedReply.trim()) return;
-    const current = list.find((comment) => comment.id === id);
-    const res = await fetch("/api/comments", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, replyText: typedReply, status: current?.status }),
-    });
-    if (!res.ok) {
-      setToast("Unable to save the administrator reply.");
-      return;
+  const refresh = useCallback(async () => {
+    setRetrying(true);
+    setLoadError("");
+    try {
+      const response = await loadComments(displayedPage, search);
+      setData(response);
+      setRequestPage(displayedPage);
+    } catch (error) {
+      setLoadError(isApiError(error) ? error.message : "Unable to reach the comments service.");
+    } finally {
+      setRetrying(false);
+      setLoading(false);
+      setPageLoading(false);
     }
+  }, [displayedPage, loadComments, search]);
 
-    const updated = await res.json();
-    const updatedList = list.map((com) => com.id === id ? updated : com);
-    setList(updatedList);
-  
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      setPageLoading(true);
+      loadComments(requestPage, search, controller.signal)
+        .then((response) => {
+          setData(response);
+          setDisplayedPage(requestPage);
+          setLoadError("");
+          setLoading(false);
+        })
+        .catch((error: unknown) => {
+          if (error instanceof DOMException && error.name === "AbortError") return;
+          setLoadError(isApiError(error) ? error.message : "Unable to reach the comments service.");
+          setLoading(false);
+        })
+        .finally(() => setPageLoading(false));
+    }, 300);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [loadComments, requestPage, search]);
 
-    setActiveReplyId(null);
-    setTypedReply("");
-    setToast("💬 Administrator response successfully attached to comment thread!");
-    setTimeout(() => setToast(null), 2500);
-  };
+  const replaceComment = (updated: Comment) => setData((current) => ({ ...current, results: current.results.map((comment) => comment.id === updated.id ? updated : comment) }));
 
-  const handleApprove = async (comment: Comment) => {
-    const res = await fetch("/api/comments", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id: comment.id, replyText: comment.replyText, status: "Approved" }),
-    });
-    if (!res.ok) {
-      setToast("Unable to approve the comment.");
-      return;
+  const setApproval = async (comment: Comment) => {
+    if (approvalId !== null) return;
+    setApprovalId(comment.id);
+    try {
+      const payload: SetCommentApprovalPayload = { id: comment.id, is_approved: !comment.is_approved };
+      replaceComment(await apiClient.patch<Comment>("/api/comments", payload));
+      setToast({ message: `Comment from ${comment.name} ${comment.is_approved ? "returned to pending" : "approved"}.`, variant: "success" });
+    } catch (error) {
+      setToast({ message: isApiError(error) ? error.message : "Unable to approve the comment.", variant: "error" });
+    } finally {
+      setApprovalId(null);
     }
-    const updated = await res.json();
-    setList(list.map((item) => item.id === updated.id ? updated : item));
-    setToast("Comment approved and published.");
   };
 
-  const handleDeleteComment = async (id: string) => {
-    const res = await fetch(`/api/comments?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    if (!res.ok) {
-      setToast("Unable to delete the comment.");
-      return;
+  const openReply = (comment: Comment) => {
+    setReplyId(comment.id);
+    setReplyText(comment.admin_reply);
+    setReplyError("");
+  };
+
+  const submitReply = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (replyId === null || replying) return;
+    const reply = replyText.trim();
+    if (!reply) { setReplyError("Enter an administrative reply before saving."); return; }
+    setReplying(true);
+    setReplyError("");
+    try {
+      const payload: ReplyToCommentPayload = { id: replyId, admin_reply: reply };
+      replaceComment(await apiClient.patch<Comment>("/api/comments", payload));
+      setReplyId(null);
+      setReplyText("");
+      setToast({ message: "Administrative reply saved.", variant: "success" });
+    } catch (error) {
+      if (isApiError(error)) setReplyError(error.fieldErrors?.admin_reply?.[0] || error.message);
+      else setReplyError("Unable to save the administrative reply.");
+    } finally {
+      setReplying(false);
     }
-    const updatedList = list.filter((item) => item.id !== id);
-    setList(updatedList);
-    // ⚡ THE SYNC: Lower lengths inside cache so home screen tile drops instantly
- 
-
-    setToast("🗑️ Comment permanently removed from view layout.");
-    setTimeout(() => setToast(null), 2500);
   };
 
-  if (loading) return (
-    <div className="p-4 text-xs text-slate-500 animate-pulse">
-      📡 Fetching Comments Deck...
-    </div>
-  );
+  const remove = async () => {
+    if (!deleteTarget || deleting) return;
+    setDeleting(true);
+    setDeleteError("");
+    try {
+      await apiClient.delete<void>(`/api/comments?id=${encodeURIComponent(String(deleteTarget.id))}`);
+      setToast({ message: `Comment from ${deleteTarget.name} deleted.`, variant: "success" });
+      setDeleteTarget(null);
+      if (data.results.length === 1 && displayedPage > 1) setRequestPage(displayedPage - 1);
+      else await refresh();
+    } catch (error) {
+      setDeleteError(isApiError(error) ? error.message : "Unable to delete the comment.");
+    } finally {
+      setDeleting(false);
+    }
+  };
 
-  const filteredList = list.filter((c) => {
-    const senderMatch = c?.sender?.toLowerCase()?.includes(search) || false;
-    const textMatch = c?.text?.toLowerCase()?.includes(search) || false;
-    const titleMatch = c?.targetTitle?.toLowerCase()?.includes(search) || false;
-    return senderMatch || textMatch || titleMatch;
-  });
-  return (
-    <div className="space-y-6 view-fade">
-      <Toast message={toast} />
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4">
-        <div>
-          <h1 className="text-xl font-bold text-white uppercase tracking-wider"> Visitor Comments Deck </h1>
-          <p className="text-xs text-slate-400 mt-0.5"> Manage visitor engagement and moderate listener interaction channels. </p>
-        </div>
-        <div className="flex items-center space-x-3">
-          <input type="text" placeholder="🔍 Search comments..." value={search} onChange={(e) => setSearch(e.target.value.toLowerCase())} className="bg-slate-900 border border-slate-800 text-white rounded-md px-3 py-1.5 text-xs outline-none focus:border-emerald-500 w-48" />
-          <button onClick={() => setShowSimForm(!showSimForm)} className="px-3 py-1.5 bg-emerald-500 text-slate-950 text-xs font-bold rounded-md cursor-pointer" > {showSimForm ? "✕ Dismiss Panel" : "＋ Simulate Visitor Submission"} </button>
-        </div>
+  return <div className="comments-page view-fade">
+    <Toast message={toast?.message || null} variant={toast?.variant} onDismiss={() => setToast(null)} />
+    <PageHeader title="Visitor Comments" description="Review real listener comments, approvals, and administrative replies." />
+    <div className="comments-filters"><Input label="Search comments" value={search} onChange={(event) => { setSearch(event.target.value); setRequestPage(1); }} placeholder="Search commenter name or comment body" /></div>
+    {loading ? <LoadingState label="Fetching comments…" /> : loadError && !data.results.length ? <ErrorState message={loadError} onRetry={() => void refresh()} retrying={retrying} /> : data.results.length === 0 ? <EmptyState icon={<MessageSquare />} title={search ? "No matching comments" : "No comments yet"} description={search ? "Try a different name or phrase." : "The backend returned no listener comments."} /> : <>
+      <div className={`comments-list ${pageLoading ? "is-loading" : ""}`} aria-busy={pageLoading}>
+        {data.results.map((comment) => { const formattedDate = formatCommentDate(comment.created_at); return <Card key={comment.id} className="comment-card">
+          <header><div><div className="comment-identity"><h2>{comment.name || "Unnamed commenter"}</h2><StatusBadge status={comment.is_approved ? "approved" : "pending"} label={comment.is_approved ? "Approved" : "Pending approval"} /></div><p>{commentAssociation(comment)}</p></div>{formattedDate ? <time dateTime={comment.created_at}>{formattedDate}</time> : <span className="comment-date-fallback">Date unavailable</span>}</header>
+          <blockquote>{comment.body}</blockquote>
+          {comment.admin_reply && <section className="comment-existing-reply"><h3>Administrative reply</h3><p>{comment.admin_reply}</p></section>}
+          <div className="comment-actions"><Button variant={comment.is_approved ? "outline" : "primary"} onClick={() => void setApproval(comment)} loading={approvalId === comment.id} loadingLabel={comment.is_approved ? "Unapproving…" : "Approving…"} disabled={approvalId !== null}>{comment.is_approved ? "Unapprove comment" : "Approve comment"}</Button><Button variant="outline" onClick={() => openReply(comment)} disabled={replying}>{comment.admin_reply ? "Edit administrative reply" : "Add administrative reply"}</Button><Button variant="destructive" onClick={() => { setDeleteError(""); setDeleteTarget(comment); }} disabled={deleting}>Delete comment</Button></div>
+          {replyId === comment.id && <form onSubmit={submitReply} className="comment-reply-form"><Textarea label="Administrative reply" value={replyText} onChange={(event) => setReplyText(event.target.value)} error={replyError} rows={4} required disabled={replying} helperText="This saves a staff reply on the comment record; it does not imply email delivery." /><div><Button variant="outline" onClick={() => { setReplyId(null); setReplyError(""); }} disabled={replying}>Cancel</Button><Button type="submit" loading={replying} loadingLabel="Saving reply…">Save reply</Button></div></form>}
+        </Card>; })}
       </div>
-
-      {/* 🛠️ SPEC VISITOR SUBMISSION SIMULATOR FORM CHANNELS */}
-      {showSimForm && (
-        <form onSubmit={handleVisitorSubmit} className="bg-slate-900 border border-slate-800 rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs form-slide border-l-4 border-l-emerald-500" >
-          <div className="space-y-3">
-            <div className="text-[10px] font-bold uppercase tracking-wider text-emerald-400"> 🌐 Public Visitor Action Simulator </div>
-            <div>
-              <label className="block text-slate-400 mb-1"> Visitor Display Name * </label>
-              <input type="text" required value={sender} onChange={(e) => setSender(e.target.value)} placeholder="e.g., Listener John" className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" />
-            </div>
-            <div>
-              <label className="block text-slate-400 mb-1"> Target Module Type (System Relationships Rule) * </label>
-              <select value={targetType} onChange={(e) => {
-                const type = e.target.value as "Article" | "Episode";
-                setTargetType(type);
-                setTargetTitle(type === "Episode" ? "Live Studio Session Mix" : "Station Launches New Morning Grid Slot");
-              }} className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" >
-                <option value="Episode">Comment on Episodes</option>
-                <option value="Article">Comment on Articles</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-slate-400 mb-1"> Select Active Show/Story Target * </label>
-              <select value={targetTitle} onChange={(e) => setTargetTitle(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" >
-                {targetType === "Episode" ? (
-                  <>
-                    <option value="Live Studio Session Mix"> Live Studio Session Mix (Radio Episode) </option>
-                    <option value="Freelancing Without Burnout"> Freelancing Without Burnout (Radio Episode) </option>
-                  </>
-                ) : (
-                  <>
-                    <option value="Station Launches New Morning Grid Slot"> Station Launches New Morning Grid Slot (News Article) </option>
-                    <option value="Top 10 Indie Audio Tracks This Summer"> Top 10 Indie Audio Tracks This Summer (News Article) </option>
-                  </>
-                )}
-              </select>
-            </div>
-          </div>
-          <div className="space-y-3 flex flex-col justify-end">
-            <div>
-              <label className="block text-slate-400 mb-1"> Comment Body Text * </label>
-              <textarea rows={3} required value={text} onChange={(e) => setText(e.target.value)} placeholder="Type what the visitor writes under the thread..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none resize-none" />
-            </div>
-            <button type="submit" className="w-full py-2 bg-emerald-500 text-slate-950 font-bold rounded-md cursor-pointer uppercase tracking-wider" > Submit & Display Immediately </button>
-          </div>
-        </form>
-      )}
-
-      {/* 📊 ADMINISTRATOR WORKFLOW ZONE (VIEW, REPLY, DELETE) */}
-      <div className="space-y-4">
-        {filteredList.length === 0 ? (
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-xs text-slate-500 font-mono tracking-wide animate-pulse"> 📡 No active visitor comments found. Click the simulation button above to submit an entry! </div>
-        ) : (
-          filteredList.map((com) => (
-            <div key={com.id} className="bg-slate-900 border border-slate-800 rounded-xl p-5 shadow-sm space-y-4 hover:border-slate-800/80 transition" >
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-xs font-bold text-slate-100 font-mono"> 👤 {com.sender} </span>
-                    <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded bg-slate-950 border border-slate-800 text-slate-400 tracking-wider"> Linked to {com.targetType} </span>
-                  </div>
-                  <div className="text-[10px] text-emerald-400 font-medium font-sans mt-1"> 🎯 Resource Destination: <span className="italic text-white"> &quot;{com.targetTitle}&quot; </span> </div>
-                </div>
-                <span className="text-[10px] font-mono text-slate-500 shrink-0"> {com.timestamp || "Historical Log"} </span>
-              </div>
-
-              <div className="p-3 bg-slate-950/60 border border-slate-800/40 rounded-lg text-xs text-slate-300 font-medium leading-relaxed italic"> &quot;{com.text}&quot; </div>
-
-              {com.replyText && (
-                <div className="p-3 bg-emerald-950/20 border border-emerald-500/10 rounded-lg text-xs text-slate-300 pl-4 border-l-2 border-l-emerald-500 space-y-1">
-                  <div className="text-[9px] font-bold uppercase tracking-wider text-emerald-400 font-mono"> ✦ Station Admin Reply: </div>
-                  <p className="font-medium text-slate-200"> &quot;{com.replyText}&quot; </p>
-                </div>
-              )}
-
-              <div className="flex justify-end items-center space-x-3 text-xs pt-1 border-t border-slate-800/40">
-                {com.status !== "Approved" && (
-                  <>
-                    <button onClick={() => handleApprove(com)} className="text-xs font-bold text-emerald-400 hover:text-emerald-300 font-sans transition cursor-pointer">Approve</button>
-                    <span className="text-slate-700 font-mono">|</span>
-                  </>
-                )}
-                {activeReplyId !== com.id ? (
-                  <button onClick={() => { setActiveReplyId(com.id); setTypedReply(com.replyText || ""); }} className="text-xs font-bold text-slate-400 hover:text-emerald-400 font-sans transition cursor-pointer" > {com.replyText ? "✎ Edit Reply" : "💬 Reply to Comment"} </button>
-                ) : (
-                  <button onClick={() => setActiveReplyId(null)} className="text-xs font-bold text-slate-500 hover:text-white font-sans transition cursor-pointer" > Cancel </button>
-                )}
-                <span className="text-slate-700 font-mono">|</span>
-                <button onClick={() => handleDeleteComment(com.id)} className="text-xs font-bold text-rose-500/80 hover:text-rose-400 font-sans transition cursor-pointer" > Delete Inappropriate </button>
-              </div>
-
-              {activeReplyId === com.id && (
-                <form onSubmit={(e) => handleSubmitReply(com.id, e)} className="pt-2 flex items-center space-x-2 form-slide" >
-                  <input type="text" required value={typedReply} onChange={(e) => setTypedReply(e.target.value)} placeholder="Type official response context..." className="flex-1 bg-slate-950 border border-slate-800 rounded px-3 py-1.5 text-xs text-white outline-none focus:border-emerald-500 transition" />
-                  <button type="submit" className="px-4 py-1.5 bg-emerald-500 text-slate-950 font-bold rounded text-xs cursor-pointer" > Submit Response </button>
-                </form>
-              )}
-            </div>
-          ))
-        )}
-      </div>
-    </div>
-  );
+      {loadError && <ErrorState message={loadError} onRetry={() => void refresh()} retrying={retrying} />}
+      <Pagination count={data.count} currentPage={displayedPage} hasNext={Boolean(data.next)} hasPrevious={Boolean(data.previous)} loading={pageLoading} onNext={() => setRequestPage(displayedPage + 1)} onPrevious={() => setRequestPage(Math.max(1, displayedPage - 1))} />
+    </>}
+    <ConfirmationDialog open={Boolean(deleteTarget)} title="Delete comment?" description={deleteTarget ? `Permanently delete the comment from ${deleteTarget.name}? This action cannot be undone.` : ""} loading={deleting} error={deleteError} onConfirm={() => void remove()} onCancel={() => { if (!deleting) { setDeleteTarget(null); setDeleteError(""); } }} />
+  </div>;
 }

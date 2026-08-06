@@ -1,193 +1,41 @@
-// 📁 FILE PATH: app/dashboard/programs/page.tsx 
-"use client"; 
-import React, { useEffect, useState } from "react"; 
-import Image from "next/image"; 
-import Toast from "../../components/toast"; 
-import { extractApiError, SiteImageFields } from "../../components/site-image-fields";
+"use client";
 
-interface Program { 
-  id: string; 
-  title: string; 
-  description: string; 
-  coverImage: string; 
-  externalCoverImage?: string;
-  presenter: string; 
-} 
+import Image from "next/image";
+import { Plus, Radio, Search } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { SiteImageFields } from "../../components/site-image-fields";
+import Toast, { type ToastVariant } from "../../components/toast";
+import { Button } from "../../components/ui/button";
+import { ConfirmationDialog } from "../../components/ui/confirmation-dialog";
+import { Input, Textarea } from "../../components/ui/form-controls";
+import { Pagination } from "../../components/ui/pagination";
+import { Card, EmptyState, ErrorState, LoadingState, PageHeader } from "../../components/ui/surfaces";
+import { apiClient, isApiError } from "../../lib/api-client";
+import type { PaginatedResponse } from "../../types/api";
 
-export default function ProgramsPage() { 
-  const [list, setList] = useState<Program[]>([]); 
-  const [loading, setLoading] = useState(true); 
-  const [showForm, setShowForm] = useState(false); 
-  const [editingProgram, setEditingProgram] = useState<Program | null>(null); 
-  const [search, setSearch] = useState(""); 
-  const [toast, setToast] = useState<string | null>(null); 
-  
-  // 📝 DOC COMPLIANT FIELD STATES 
-  const [title, setTitle] = useState(""); 
-  const [description, setDescription] = useState(""); 
-  const [coverImage, setCoverImage] = useState(""); 
-  const [presenter, setPresenter] = useState(""); 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [formError, setFormError] = useState("");
+interface Program { id:string; title:string; description:string; coverImage:string; externalCoverImage?:string; presenter:string }
+type ToastState={message:string;variant:ToastVariant}|null;
+const emptyPage:PaginatedResponse<Program>={count:0,next:null,previous:null,results:[]};
 
-  useEffect(() => { 
-    fetch("/api/programs") 
-      .then((res) => res.json()) 
-      .then((data) => { 
-        setList(Array.isArray(data) ? data : data.results || []);
-     
-        setLoading(false); 
-      }) 
-      .catch(() => setLoading(false)); 
-  }, []); 
+export default function ProgramsPage(){
+  const [data,setData]=useState(emptyPage);const [page,setPage]=useState(1);const [search,setSearch]=useState("");const [loading,setLoading]=useState(true);const [pageLoading,setPageLoading]=useState(false);const [loadError,setLoadError]=useState("");const [retrying,setRetrying]=useState(false);
+  const [showForm,setShowForm]=useState(false);const [editing,setEditing]=useState<Program|null>(null);const [title,setTitle]=useState("");const [presenter,setPresenter]=useState("");const [description,setDescription]=useState("");const [coverImage,setCoverImage]=useState("");const [selectedFile,setSelectedFile]=useState<File|null>(null);const [submitting,setSubmitting]=useState(false);const [fieldErrors,setFieldErrors]=useState<Record<string,string[]>>({});const [formError,setFormError]=useState("");
+  const [deleteTarget,setDeleteTarget]=useState<Program|null>(null);const [deleting,setDeleting]=useState(false);const [deleteError,setDeleteError]=useState("");const [toast,setToast]=useState<ToastState>(null);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!title || !presenter) return;
-    setFormError("");
-    const form = new FormData();
-    if (editingProgram) form.set("id", editingProgram.id);
-    form.set("title", title);
-    form.set("description", description);
-    form.set("presenter", presenter);
-    if (coverImage) form.set("cover_image", coverImage);
-    if (selectedFile) form.set("uploaded_cover_image", selectedFile);
-    const res = await fetch("/api/programs", {
-      method: editingProgram ? "PUT" : "POST",
-      body: form,
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setFormError(extractApiError(data));
-      return;
-    }
-    setList(editingProgram
-      ? list.map((program) => program.id === data.id ? data : program)
-      : [data, ...list]);
-    setToast(editingProgram ? "Program updated." : "Program created.");
-    clearForm();
-  };
+  const loadPrograms=useCallback(async(targetPage:number,query:string,signal?:AbortSignal)=>{const params=new URLSearchParams({page:String(targetPage),ordering:"title"});if(query.trim())params.set("search",query.trim());return apiClient.get<PaginatedResponse<Program>>(`/api/programs?${params}`,{signal});},[]);
+  const refresh=useCallback(async()=>{setRetrying(true);setLoadError("");try{setData(await loadPrograms(page,search));}catch(error){if(isApiError(error))setLoadError(error.message);else setLoadError("Unable to reach the programs service.");}finally{setRetrying(false);setLoading(false);setPageLoading(false);}},[loadPrograms,page,search]);
+  useEffect(()=>{const controller=new AbortController();const timer=window.setTimeout(()=>{setPageLoading(true);loadPrograms(page,search,controller.signal).then((response)=>{setData(response);setLoadError("");setLoading(false);}).catch((error:unknown)=>{if(error instanceof DOMException&&error.name==="AbortError")return;setLoadError(isApiError(error)?error.message:"Unable to reach the programs service.");setLoading(false);}).finally(()=>setPageLoading(false));},250);return()=>{window.clearTimeout(timer);controller.abort();};},[loadPrograms,page,search]);
 
-  const startEdit = (p: Program) => { 
-    setEditingProgram(p); 
-    setTitle(p.title); 
-    setDescription(p.description); 
-    setCoverImage(p.externalCoverImage || ""); 
-    setSelectedFile(null);
-    setPresenter(p.presenter); 
-    setShowForm(true); 
-  }; 
+  const clearForm=()=>{setTitle("");setPresenter("");setDescription("");setCoverImage("");setSelectedFile(null);setEditing(null);setFieldErrors({});setFormError("");setShowForm(false);};
+  const startEdit=(program:Program)=>{setEditing(program);setTitle(program.title);setPresenter(program.presenter);setDescription(program.description);setCoverImage(program.externalCoverImage||"");setSelectedFile(null);setFieldErrors({});setFormError("");setShowForm(true);};
+  const save=async(event:React.FormEvent)=>{event.preventDefault();if(submitting)return;setSubmitting(true);setFieldErrors({});setFormError("");const form=new FormData();if(editing)form.set("id",editing.id);form.set("title",title);form.set("presenter",presenter);form.set("description",description);if(coverImage)form.set("cover_image",coverImage);if(selectedFile)form.set("uploaded_cover_image",selectedFile);try{await (editing?apiClient.put<Program>("/api/programs",form):apiClient.post<Program>("/api/programs",form));setToast({message:editing?"Program updated successfully.":"Program created successfully.",variant:"success"});clearForm();if(!editing&&page!==1)setPage(1);else await refresh();}catch(error){if(isApiError(error)){setFieldErrors(error.fieldErrors||{});setFormError(error.message);}else setFormError("Unable to save the program. Please try again.");}finally{setSubmitting(false);}};
+  const remove=async()=>{if(!deleteTarget||deleting)return;setDeleting(true);setDeleteError("");try{await apiClient.delete<void>(`/api/programs?id=${encodeURIComponent(deleteTarget.id)}`);setToast({message:`${deleteTarget.title} was deleted.`,variant:"success"});setDeleteTarget(null);if(data.results.length===1&&page>1)setPage((value)=>value-1);else await refresh();}catch(error){setDeleteError(isApiError(error)?error.message:"Unable to delete the program. Please try again.");}finally{setDeleting(false);}};
 
-  const handleDelete = async (id: string, itemTitle: string) => {
-    const res = await fetch(`/api/programs?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    if (!res.ok) {
-      setToast("Unable to delete the program.");
-      return;
-    }
-    const updatedList = list.filter((item) => item.id !== id);
-    setList(updatedList); 
-   
-    setToast( `🗑️ Show channel "${itemTitle.toUpperCase()}" deleted successfully.`, ); 
-    setTimeout(() => setToast(null), 2500); 
-  }; 
-
-  const clearForm = () => { 
-    setTitle(""); 
-    setDescription(""); 
-    setCoverImage(""); 
-    setPresenter(""); 
-    setSelectedFile(null);
-    setFormError("");
-    setEditingProgram(null); 
-    setShowForm(false); 
-    setTimeout(() => setToast(null), 2500); 
-  }; 
-
-  if (loading) return ( 
-    <div className="p-4 text-xs text-slate-500 animate-pulse"> 
-      📡 Fetching Radio Programs... 
-    </div> 
-  ); 
-
-  const filteredList = list.filter( 
-    (p) => p.title.toLowerCase().includes(search) || p.presenter.toLowerCase().includes(search), 
-  ); 
-
-  return ( 
-    <div className="space-y-6 view-fade"> 
-      <Toast message={toast} /> 
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-slate-800 pb-4"> 
-        <div> 
-          <h1 className="text-xl font-bold text-white uppercase tracking-wider"> Radio Programs </h1> 
-          <p className="text-xs text-slate-400 mt-0.5"> Manage all CBM Radio programs channels. </p> 
-        </div> 
-        <div className="flex items-center space-x-3"> 
-          <input type="text" placeholder="🔍 Search programs..." value={search} onChange={(e) => setSearch(e.target.value.toLowerCase())} className="bg-slate-900 border border-slate-800 text-white rounded-md px-3 py-1.5 text-xs outline-none focus:border-emerald-500 w-48" /> 
-          <button onClick={() => { if (showForm) clearForm(); else setShowForm(true); }} className="px-3 py-1.5 bg-emerald-500 text-slate-950 text-xs font-bold rounded-md cursor-pointer" > {showForm ? "✕ Dismiss" : "＋ Add Program"} </button> 
-        </div> 
-      </div> 
-
-      {showForm && ( 
-        <form onSubmit={handleSave} className="bg-slate-900 border border-slate-800 rounded-xl p-5 grid grid-cols-1 md:grid-cols-2 gap-4 text-xs form-slide" > 
-          <div className="space-y-3"> 
-            <div> 
-              <label className="block text-slate-400 mb-1"> Program Title * </label> 
-              <input type="text" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. morning show, youth talk" className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" /> 
-            </div> 
-            <div> 
-              <label className="block text-slate-400 mb-1"> Presenter Name * </label> 
-              <input type="text" required value={presenter} onChange={(e) => setPresenter(e.target.value)} placeholder="Sarah Jenkins" className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none" /> </div> 
-            <SiteImageFields
-              currentUrl={editingProgram?.coverImage}
-              externalUrl={coverImage}
-              file={selectedFile}
-              onExternalUrlChange={setCoverImage}
-              onFileChange={setSelectedFile}
-            />
-          </div> 
-          <div className="space-y-3 flex flex-col justify-between"> 
-            <div> 
-              <label className="block text-slate-400 mb-1"> Description Overview Slot Notes </label> 
-              <textarea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Enter track details, schedule slots summary..." className="w-full bg-slate-950 border border-slate-800 rounded px-3 py-2 text-white outline-none resize-none" /> </div> 
-            <div className="flex justify-end space-x-2"> 
-              <button type="button" onClick={clearForm} className="px-4 py-2 rounded bg-slate-800 text-slate-300 font-bold" > Cancel </button> 
-              <button type="submit" className="px-6 py-2 bg-emerald-500 text-slate-950 font-bold rounded uppercase tracking-wider" > {editingProgram ? "Update Program" : "Commit Program"} </button> 
-            </div> 
-            {formError && <p className="text-rose-400">{formError}</p>}
-          </div> 
-        </form> 
-      )} 
-
-      {filteredList.length === 0 ? ( 
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-xs text-slate-500 font-mono tracking-wide animate-pulse"> 📡 No active show programs match your query criteria. </div> 
-      ) : ( 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> 
-          {filteredList.map((prog) => ( 
-            <div key={prog.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm flex flex-col sm:flex-row group hover:border-slate-700 transition" > 
-              <div className="relative w-full sm:w-36 h-40 bg-slate-950 border-b sm:border-b-0 sm:border-r border-slate-800 shrink-0"> 
-                <Image src={ prog.coverImage || "https://unsplash.com" } alt={prog.title} fill className="w-full h-full object-cover transition duration-300 group-hover:scale-105" /> 
-              </div> 
-              <div className="p-4 flex-1 min-w-0 flex flex-col justify-between space-y-3"> 
-                <div className="space-y-1"> 
-                  <div className="flex items-start justify-between gap-2"> 
-                    <h3 className="text-sm font-bold text-white uppercase tracking-wide truncate"> {prog.title} </h3> 
-                    <span className="text-[10px] font-bold text-emerald-400 shrink-0 font-sans"> 🎙️ {prog.presenter} </span> 
-                  </div> 
-                  <p className="text-[11px] text-slate-400 line-clamp-3 leading-relaxed pt-1"> {prog.description} </p> 
-                </div> 
-                <div className="flex items-center justify-between pt-2 border-t border-slate-800/60 text-xs"> 
-                  <span className="text-[9px] font-extrabold text-slate-500 uppercase font-mono tracking-widest"> Live Channel Track </span> 
-                  <div className="flex space-x-3 font-bold"> 
-                    <button onClick={() => startEdit(prog)} className="text-slate-400 hover:text-emerald-400 transition" > Edit </button> 
-                    <span className="text-slate-800">|</span> 
-                    <button onClick={() => handleDelete(prog.id, prog.title)} className="text-rose-500 hover:text-rose-400 transition" > Delete </button> 
-                  </div> 
-                </div> 
-              </div> 
-            </div> 
-          ))} 
-        </div> 
-      )} 
-    </div> 
-  ); 
+  const primaryAction=<Button icon={<Plus aria-hidden="true"/>} onClick={()=>showForm?clearForm():setShowForm(true)}>{showForm?"Dismiss form":"Add program"}</Button>;
+  return <div className="space-y-6 view-fade"><Toast message={toast?.message||null} variant={toast?.variant} onDismiss={()=>setToast(null)}/><PageHeader title="Radio Programs" description="Manage CBM Radio program channels." primaryAction={primaryAction}/>
+    <div className="program-search"><Input label="Search programs" value={search} onChange={(event)=>{setSearch(event.target.value);setPage(1);}} placeholder="Search title or presenter"/><Search aria-hidden="true"/></div>
+    {showForm&&<Card className="program-form-card"><form onSubmit={save} className="program-form"><div><Input label="Program title" required value={title} onChange={(event)=>setTitle(event.target.value)} error={fieldErrors.title?.[0]} disabled={submitting}/><Input label="Presenter name" required value={presenter} onChange={(event)=>setPresenter(event.target.value)} error={fieldErrors.presenter?.[0]} disabled={submitting}/><SiteImageFields currentUrl={editing?.coverImage} externalUrl={coverImage} file={selectedFile} onExternalUrlChange={setCoverImage} onFileChange={setSelectedFile}/></div><div><Textarea label="Description" rows={6} value={description} onChange={(event)=>setDescription(event.target.value)} error={fieldErrors.description?.[0]} disabled={submitting}/>{formError&&<p className="ui-field-error" role="alert">{formError}</p>}<div className="program-form-actions"><Button variant="outline" onClick={clearForm} disabled={submitting}>Cancel</Button><Button type="submit" loading={submitting} loadingLabel={editing?"Updating…":"Creating…"}>{editing?"Update program":"Create program"}</Button></div></div></form></Card>}
+    {loading?<LoadingState label="Fetching radio programs…"/>:loadError&&!data.results.length?<ErrorState message={loadError} onRetry={()=>void refresh()} retrying={retrying}/>:data.results.length===0?<EmptyState icon={<Radio/>} title={search?"No matching programs":"No programs yet"} description={search?"Try another search term.":"Create the first program to begin."} action={!search&&primaryAction}/>:<><div className={`program-grid ${pageLoading?"is-loading":""}`} aria-busy={pageLoading}>{data.results.map((program)=><Card key={program.id} className="program-card">{program.coverImage?<div className="program-image"><Image src={program.coverImage} alt="" fill unoptimized className="object-cover"/></div>:<div className="program-image program-image-empty"><Radio aria-hidden="true"/></div>}<div className="program-card-body"><div><h2>{program.title}</h2><p className="program-presenter">Presented by {program.presenter}</p><p>{program.description||"No description provided."}</p></div><div className="program-card-actions"><Button variant="ghost" onClick={()=>startEdit(program)}>Edit</Button><Button variant="ghost" className="program-delete-button" onClick={()=>{setDeleteError("");setDeleteTarget(program);}}>Delete</Button></div></div></Card>)}</div>{loadError&&<ErrorState message={loadError} onRetry={()=>void refresh()} retrying={retrying}/>}<Pagination count={data.count} currentPage={page} hasNext={Boolean(data.next)} hasPrevious={Boolean(data.previous)} loading={pageLoading} onNext={()=>setPage((value)=>value+1)} onPrevious={()=>setPage((value)=>Math.max(1,value-1))}/></>}
+    <ConfirmationDialog open={Boolean(deleteTarget)} title="Delete program?" description={deleteTarget?`Delete “${deleteTarget.title}”? This action cannot be undone.`:""} loading={deleting} error={deleteError} onConfirm={()=>void remove()} onCancel={()=>{if(!deleting){setDeleteTarget(null);setDeleteError("");}}}/>
+  </div>;
 }

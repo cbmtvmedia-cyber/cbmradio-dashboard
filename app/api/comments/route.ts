@@ -1,113 +1,56 @@
-import { NextResponse } from 'next/server';
-import {
-  BACKEND_API_V1_URL,
-  backendAuthFailure,
-  getBackendAuthHeaders,
-  unauthorizedResponse,
-} from "../../lib/backend-auth";
-import { asRecord, bool, forwardBackendResponse, requestError, text } from "../../lib/backend-api";
+import { asRecord, bool, forwardBackendResponse, number, requestError, text } from "../../lib/backend-api";
+import { BACKEND_API_V1_URL, getBackendAuthHeaders, unauthorizedResponse } from "../../lib/backend-auth";
 
 function toComment(item: Record<string, unknown>) {
-  const isArticle = item.article != null;
   return {
-    ...item, id: String(item.id ?? ""), sender: text(item.name), text: text(item.body),
-    targetType: isArticle ? "Article" : "Episode",
-    targetTitle: isArticle ? `Article #${item.article}` : `Episode #${item.episode}`,
-    timestamp: text(item.created_at),
-    status: bool(item.is_approved) ? "Approved" : "Pending",
-    replyText: text(item.admin_reply),
+    id: number(item.id) ?? 0,
+    name: text(item.name),
+    body: text(item.body),
+    is_approved: bool(item.is_approved),
+    admin_reply: text(item.admin_reply),
+    created_at: text(item.created_at),
+    article: number(item.article) ?? null,
+    episode: number(item.episode) ?? null,
   };
 }
 
-// 🔄 UPDATED: Points exactly to your master production variable saved in .env.local
-// 1. GET ROUTE: Fetch live paginated comments directly from Railway
-export async function GET() {
+export async function GET(request: Request) {
   const headers = await getBackendAuthHeaders();
   if (!headers) return unauthorizedResponse();
-
+  const incoming = new URL(request.url).searchParams;
+  const approved = new URLSearchParams();
+  for (const key of ["page", "search"] as const) {
+    const value = incoming.get(key)?.trim();
+    if (value) approved.set(key, value);
+  }
+  const query = approved.size ? `?${approved.toString()}` : "";
   try {
-    const response = await fetch(`${BACKEND_API_V1_URL}/comments/`, {
-      headers,
-      cache: "no-store" 
-    });
-    
-    const authFailure = await backendAuthFailure(response);
-    if (authFailure) return authFailure;
-    if (!response.ok) throw new Error("Railway fetch failed");
-    return forwardBackendResponse(response, toComment);
+    return forwardBackendResponse(
+      await fetch(`${BACKEND_API_V1_URL}/comments/${query}`, { headers, cache: "no-store" }),
+      toComment,
+    );
   } catch {
-    // Clean fallback matching your original baseline structure to prevent UI breaks
-    return NextResponse.json({
-      results: [
-        {
-          id: "com-1",
-          sender: "Listener John",
-          text: "Loving the alternative tracks mix on the morning block!",
-          targetType: "Episode",
-          targetTitle: "Live Studio Session Mix",
-          timestamp: "Historical Log"
-        }
-      ]
-    });
+    return requestError("Unable to reach the comments service.", 502);
   }
 }
 
-// 2. POST ROUTE: Receive new listener comments from your form layout
-export async function POST(request: Request) {
+export async function PATCH(request: Request) {
   const headers = await getBackendAuthHeaders(true);
   if (!headers) return unauthorizedResponse();
-
   try {
-    const incomingData = asRecord(await request.json());
-
-    const formattedPayload = {
-      name: incomingData.name || incomingData.sender || "Anonymous Listener", 
-      email: incomingData.email || "listener@cbmradio.com", 
-      body: incomingData.body || incomingData.text || "", 
-      article: incomingData.article || undefined,
-      episode: incomingData.episode || undefined,
-    };
-
-    const response = await fetch(`${BACKEND_API_V1_URL}/comments/`, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(formattedPayload),
-    });
-
-    const authFailure = await backendAuthFailure(response);
-    if (authFailure) return authFailure;
-    if (!response.ok) throw new Error("Failed to post comment to backend");
-    return forwardBackendResponse(response, toComment);
+    const incoming = asRecord(await request.json());
+    const id = number(incoming.id);
+    if (!id) return requestError("Comment id is required.");
+    const payload: Record<string, unknown> = {};
+    if (typeof incoming.is_approved === "boolean") payload.is_approved = incoming.is_approved;
+    if (typeof incoming.admin_reply === "string") payload.admin_reply = incoming.admin_reply;
+    if (!Object.keys(payload).length) return requestError("A moderation change is required.");
+    return forwardBackendResponse(await fetch(
+      `${BACKEND_API_V1_URL}/comments/${encodeURIComponent(String(id))}/`,
+      { method: "PATCH", headers, body: JSON.stringify(payload) },
+    ), toComment);
   } catch {
-    return NextResponse.json({ error: "Comments post endpoint offline" }, { status: 500 });
-  }
-}
-
-// 3. PUT ROUTE: Handles approving or updating comments status from dashboard
-export async function PUT(request: Request) {
-  const headers = await getBackendAuthHeaders(true);
-  if (!headers) return unauthorizedResponse();
-
-  try {
-    const incomingData = asRecord(await request.json());
-
-    const formattedPayload = {
-      is_approved: incomingData.status === "Approved" || incomingData.is_approved === true,
-      admin_reply: text(incomingData.admin_reply, text(incomingData.replyText)),
-    };
-
-    const response = await fetch(`${BACKEND_API_V1_URL}/comments/${incomingData.id}/`, {
-      method: "PATCH",
-      headers,
-      body: JSON.stringify(formattedPayload),
-    });
-
-    const authFailure = await backendAuthFailure(response);
-    if (authFailure) return authFailure;
-    if (!response.ok) throw new Error("Failed to update comment on backend");
-    return forwardBackendResponse(response, toComment);
-  } catch {
-    return NextResponse.json({ error: "Comments update endpoint offline" }, { status: 500 });
+    return requestError("Unable to reach the comments service.", 502);
   }
 }
 
@@ -117,9 +60,10 @@ export async function DELETE(request: Request) {
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return requestError("Comment id is required.");
   try {
-    return forwardBackendResponse(await fetch(`${BACKEND_API_V1_URL}/comments/${encodeURIComponent(id)}/`, {
-      method: "DELETE", headers,
-    }));
+    return forwardBackendResponse(await fetch(
+      `${BACKEND_API_V1_URL}/comments/${encodeURIComponent(id)}/`,
+      { method: "DELETE", headers },
+    ));
   } catch {
     return requestError("Unable to reach the comments service.", 502);
   }

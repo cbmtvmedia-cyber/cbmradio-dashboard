@@ -29,8 +29,6 @@ useEffect(() => {
       const data = await res.json();
 
       if (res.ok && data.user) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-
         setToast("⚡ Authorization Verified! Unlocking Control Tower Room...");
         setTimeout(() => {
           window.location.href = "/dashboard";
