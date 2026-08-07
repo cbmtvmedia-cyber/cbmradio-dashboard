@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 interface TopbarProps {
   isCollapsed: boolean;
@@ -7,6 +8,7 @@ interface TopbarProps {
 }
 
 export default function Topbar({ isCollapsed, setIsCollapsed }: TopbarProps) {
+  const router = useRouter();
   const [adminUsername, setAdminUsername] = useState("Admin User");
 
   useEffect(() => {
@@ -25,7 +27,7 @@ export default function Topbar({ isCollapsed, setIsCollapsed }: TopbarProps) {
       await fetch("/api/auth/logout", { method: "POST" });
     } finally {
       localStorage.clear();
-      window.location.href = "/login";
+      router.replace("/login");
     }
   };
 

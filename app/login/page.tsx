@@ -2,8 +2,10 @@
 import React, { useState, useEffect } from "react";
 import Toast from "../components/toast";
 import { LockIcon } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function AdminLoginPage() {
+  const router = useRouter();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,7 +33,7 @@ useEffect(() => {
       if (res.ok && data.user) {
         setToast("⚡ Authorization Verified! Unlocking Control Tower Room...");
         setTimeout(() => {
-          window.location.href = "/dashboard";
+          router.replace("/dashboard");
         }, 1500);
       } else {
         setToast(data.error || "❌ Access Denied: Invalid Administrator Credentials.");
